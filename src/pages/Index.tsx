@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Calendar, Clock, Users } from "lucide-react";
+import { MapPin, Calendar, Clock, Users, ExternalLink } from "lucide-react";
 import Header from '@/components/Header';
 import LoginModal from '@/components/LoginModal';
 import Map from '@/components/Map';
@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Event {
   id: number;
-  type: 'futebol' | 'volei';
+  type: string;
   address: string;
   date: string;
   time: string;
@@ -23,30 +23,7 @@ interface Event {
 
 const Index = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [events, setEvents] = useState<Event[]>([
-    {
-      id: 1,
-      type: 'futebol',
-      address: 'Rua das Flores, 123 - Centro, São Paulo - SP',
-      date: '2025-07-10',
-      time: '19:00',
-      status: 'Por acontecer',
-      lat: -23.5505,
-      lng: -46.6333,
-      confirmed: []
-    },
-    {
-      id: 2,
-      type: 'volei',
-      address: 'Av. Paulista, 456 - Bela Vista, São Paulo - SP',
-      date: '2025-07-12',
-      time: '18:30',
-      status: 'Por acontecer',
-      lat: -23.5618,
-      lng: -46.6565,
-      confirmed: []
-    }
-  ]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const { toast } = useToast();
@@ -56,8 +33,42 @@ const Index = () => {
     if (user) {
       setCurrentUser(user);
     }
-    if (events.length > 0) {
-      setSelectedEvent(events[0]);
+    
+    // Load events from localStorage or use defaults
+    const savedEvents = localStorage.getItem('events');
+    if (savedEvents) {
+      const parsedEvents = JSON.parse(savedEvents);
+      setEvents(parsedEvents);
+      if (parsedEvents.length > 0) {
+        setSelectedEvent(parsedEvents[0]);
+      }
+    } else {
+      const defaultEvents = [
+        {
+          id: 1,
+          type: 'futebol',
+          address: 'Rua das Flores, 123 - Centro, São Paulo - SP',
+          date: '2025-07-10',
+          time: '19:00',
+          status: 'Por acontecer' as const,
+          lat: -23.5505,
+          lng: -46.6333,
+          confirmed: []
+        },
+        {
+          id: 2,
+          type: 'volei',
+          address: 'Av. Paulista, 456 - Bela Vista, São Paulo - SP',
+          date: '2025-07-12',
+          time: '18:30',
+          status: 'Por acontecer' as const,
+          lat: -23.5618,
+          lng: -46.6565,
+          confirmed: []
+        }
+      ];
+      setEvents(defaultEvents);
+      setSelectedEvent(defaultEvents[0]);
     }
   }, []);
 
@@ -72,7 +83,7 @@ const Index = () => {
       return;
     }
 
-    setEvents(prev => prev.map(event => {
+    const updatedEvents = events.map(event => {
       if (event.id === eventId) {
         const isAlreadyConfirmed = event.confirmed.includes(currentUser);
         const newConfirmed = isAlreadyConfirmed 
@@ -87,7 +98,15 @@ const Index = () => {
         return { ...event, confirmed: newConfirmed };
       }
       return event;
-    }));
+    });
+
+    setEvents(updatedEvents);
+    localStorage.setItem('events', JSON.stringify(updatedEvents));
+  };
+
+  const handleOpenGoogleMaps = (event: Event) => {
+    const googleMapsUrl = `https://www.google.com/maps?q=${event.lat},${event.lng}`;
+    window.open(googleMapsUrl, '_blank');
   };
 
   const getStatusColor = (status: string) => {
@@ -100,7 +119,15 @@ const Index = () => {
   };
 
   const getGameIcon = (type: string) => {
-    return type === 'futebol' ? '⚽' : '🏐';
+    if (type.includes('futebol') && type.includes('volei')) return '🏆';
+    return type.includes('futebol') ? '⚽' : '🏐';
+  };
+
+  const getGameName = (type: string) => {
+    const sports = type.split(',').map(sport => 
+      sport.charAt(0).toUpperCase() + sport.slice(1)
+    );
+    return sports.join(' + ');
   };
 
   return (
@@ -138,7 +165,7 @@ const Index = () => {
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2 text-xl">
                         <span className="text-2xl">{getGameIcon(event.type)}</span>
-                        {event.type.charAt(0).toUpperCase() + event.type.slice(1)}
+                        {getGameName(event.type)}
                       </CardTitle>
                       <Badge className={`${getStatusColor(event.status)} text-white`}>
                         {event.status}
@@ -167,24 +194,38 @@ const Index = () => {
                       </div>
                     </div>
                     
-                    {event.status === 'Por acontecer' && (
-                      <Button 
+                    <div className="flex gap-2">
+                      {event.status === 'Por acontecer' && (
+                        <Button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleConfirmPresence(event.id);
+                          }}
+                          className={`flex-1 transition-all duration-300 ${
+                            currentUser && event.confirmed.includes(currentUser)
+                              ? 'bg-red-500 hover:bg-red-600 text-white'
+                              : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
+                          }`}
+                        >
+                          {currentUser && event.confirmed.includes(currentUser) 
+                            ? 'Cancelar Presença' 
+                            : 'Confirmar Presença'
+                          }
+                        </Button>
+                      )}
+                      
+                      <Button
+                        variant="outline"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleConfirmPresence(event.id);
+                          handleOpenGoogleMaps(event);
                         }}
-                        className={`w-full transition-all duration-300 ${
-                          currentUser && event.confirmed.includes(currentUser)
-                            ? 'bg-red-500 hover:bg-red-600 text-white'
-                            : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
-                        }`}
+                        className="flex items-center gap-1"
                       >
-                        {currentUser && event.confirmed.includes(currentUser) 
-                          ? 'Cancelar Presença' 
-                          : 'Confirmar Presença'
-                        }
+                        <ExternalLink className="h-4 w-4" />
+                        Google Maps
                       </Button>
-                    )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}

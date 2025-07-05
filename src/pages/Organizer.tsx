@@ -8,13 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Users, MessageCircle, ArrowLeft } from "lucide-react";
+import { Plus, Edit, Trash2, Users, MessageCircle, ArrowLeft, MapPin } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
+import Map from '@/components/Map';
 
 interface Event {
   id: number;
-  type: 'futebol' | 'volei';
+  type: string;
   address: string;
   date: string;
   time: string;
@@ -35,11 +37,13 @@ const Organizer = () => {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [eventForm, setEventForm] = useState({
-    type: 'futebol' as 'futebol' | 'volei',
+    type: [] as string[],
     address: '',
     date: '',
     time: '',
-    status: 'Por acontecer' as 'Por acontecer' | 'Em andamento' | 'Encerrado'
+    status: 'Por acontecer' as 'Por acontecer' | 'Em andamento' | 'Encerrado',
+    lat: -23.5505,
+    lng: -46.6333
   });
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -66,7 +70,7 @@ const Organizer = () => {
       const defaultEvents = [
         {
           id: 1,
-          type: 'futebol' as const,
+          type: 'futebol',
           address: 'Rua das Flores, 123 - Centro, São Paulo - SP',
           date: '2025-07-10',
           time: '19:00',
@@ -77,7 +81,7 @@ const Organizer = () => {
         },
         {
           id: 2,
-          type: 'volei' as const,
+          type: 'volei',
           address: 'Av. Paulista, 456 - Bela Vista, São Paulo - SP',
           date: '2025-07-12',
           time: '18:30',
@@ -100,7 +104,7 @@ const Organizer = () => {
   };
 
   const handleSaveEvent = () => {
-    if (!eventForm.address || !eventForm.date || !eventForm.time) {
+    if (!eventForm.address || !eventForm.date || !eventForm.time || eventForm.type.length === 0) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos obrigatórios",
@@ -111,9 +115,13 @@ const Organizer = () => {
 
     const newEvent: Event = {
       id: editingEvent?.id || Date.now(),
-      ...eventForm,
-      lat: -23.5505 + (Math.random() - 0.5) * 0.1,
-      lng: -46.6333 + (Math.random() - 0.5) * 0.1,
+      type: eventForm.type.join(','),
+      address: eventForm.address,
+      date: eventForm.date,
+      time: eventForm.time,
+      status: eventForm.status,
+      lat: eventForm.lat,
+      lng: eventForm.lng,
       confirmed: editingEvent?.confirmed || []
     };
 
@@ -137,11 +145,13 @@ const Organizer = () => {
     setIsEventModalOpen(false);
     setEditingEvent(null);
     setEventForm({
-      type: 'futebol',
+      type: [],
       address: '',
       date: '',
       time: '',
-      status: 'Por acontecer'
+      status: 'Por acontecer',
+      lat: -23.5505,
+      lng: -46.6333
     });
   };
 
@@ -158,20 +168,62 @@ const Organizer = () => {
   const handleEditEvent = (event: Event) => {
     setEditingEvent(event);
     setEventForm({
-      type: event.type,
+      type: event.type.split(','),
       address: event.address,
       date: event.date,
       time: event.time,
-      status: event.status
+      status: event.status,
+      lat: event.lat,
+      lng: event.lng
     });
     setIsEventModalOpen(true);
+  };
+
+  const handleDeleteUser = (username: string) => {
+    const updatedUsers = users.filter(user => user.username !== username);
+    setUsers(updatedUsers);
+    localStorage.setItem('users', JSON.stringify(updatedUsers));
+    
+    // Remove user from all event confirmations
+    const updatedEvents = events.map(event => ({
+      ...event,
+      confirmed: event.confirmed.filter(user => user !== username)
+    }));
+    setEvents(updatedEvents);
+    localStorage.setItem('events', JSON.stringify(updatedEvents));
+    
+    toast({
+      title: "Sucesso",
+      description: "Usuário removido com sucesso!"
+    });
+  };
+
+  const handleLocationSelect = (lat: number, lng: number) => {
+    setEventForm(prev => ({ ...prev, lat, lng }));
+    toast({
+      title: "Local selecionado",
+      description: `Coordenadas: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
+    });
+  };
+
+  const handleSportChange = (sport: string, checked: boolean) => {
+    setEventForm(prev => ({
+      ...prev,
+      type: checked 
+        ? [...prev.type, sport]
+        : prev.type.filter(s => s !== sport)
+    }));
   };
 
   const generateWhatsAppMessage = (event: Event) => {
     const confirmed = event.confirmed;
     const absent = users.filter(user => !confirmed.includes(user.username));
     
-    const message = `🏆 *${event.type.toUpperCase()} - ${new Date(event.date).toLocaleDateString('pt-BR')}*
+    const sportNames = event.type.split(',').map(sport => 
+      sport.charAt(0).toUpperCase() + sport.slice(1)
+    ).join(' + ');
+    
+    const message = `🏆 *${sportNames} - ${new Date(event.date).toLocaleDateString('pt-BR')}*
     
 📍 *Local:* ${event.address}
 ⏰ *Horário:* ${event.time}
@@ -181,6 +233,8 @@ ${confirmed.map(name => `• ${name}`).join('\n')}
 
 ❌ *AUSENTES (${absent.length}):*
 ${absent.map(user => `• ${user.username}`).join('\n')}
+
+📍 *Google Maps:* https://www.google.com/maps?q=${event.lat},${event.lng}
 
 Vamos jogar! 🔥`;
 
@@ -236,78 +290,103 @@ Vamos jogar! 🔥`;
                     Novo Evento
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>{editingEvent ? 'Editar Evento' : 'Novo Evento'}</DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="type">Tipo de Jogo</Label>
-                      <Select
-                        value={eventForm.type}
-                        onValueChange={(value: 'futebol' | 'volei') => 
-                          setEventForm(prev => ({ ...prev, type: value }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="futebol">⚽ Futebol</SelectItem>
-                          <SelectItem value="volei">🏐 Vôlei</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="address">Endereço</Label>
-                      <Input
-                        id="address"
-                        value={eventForm.address}
-                        onChange={(e) => setEventForm(prev => ({ ...prev, address: e.target.value }))}
-                        placeholder="Endereço completo"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Form */}
+                    <div className="space-y-4">
                       <div>
-                        <Label htmlFor="date">Data</Label>
-                        <Input
-                          id="date"
-                          type="date"
-                          value={eventForm.date}
-                          onChange={(e) => setEventForm(prev => ({ ...prev, date: e.target.value }))}
-                        />
+                        <Label>Tipo de Jogo</Label>
+                        <div className="flex space-x-4 mt-2">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="futebol"
+                              checked={eventForm.type.includes('futebol')}
+                              onCheckedChange={(checked) => handleSportChange('futebol', checked as boolean)}
+                            />
+                            <Label htmlFor="futebol">⚽ Futebol</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="volei"
+                              checked={eventForm.type.includes('volei')}
+                              onCheckedChange={(checked) => handleSportChange('volei', checked as boolean)}
+                            />
+                            <Label htmlFor="volei">🏐 Vôlei</Label>
+                          </div>
+                        </div>
                       </div>
                       <div>
-                        <Label htmlFor="time">Horário</Label>
+                        <Label htmlFor="address">Endereço</Label>
                         <Input
-                          id="time"
-                          type="time"
-                          value={eventForm.time}
-                          onChange={(e) => setEventForm(prev => ({ ...prev, time: e.target.value }))}
+                          id="address"
+                          value={eventForm.address}
+                          onChange={(e) => setEventForm(prev => ({ ...prev, address: e.target.value }))}
+                          placeholder="Endereço completo"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="date">Data</Label>
+                          <Input
+                            id="date"
+                            type="date"
+                            value={eventForm.date}
+                            onChange={(e) => setEventForm(prev => ({ ...prev, date: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="time">Horário</Label>
+                          <Input
+                            id="time"
+                            type="time"
+                            value={eventForm.time}
+                            onChange={(e) => setEventForm(prev => ({ ...prev, time: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="status">Status</Label>
+                        <Select
+                          value={eventForm.status}
+                          onValueChange={(value: 'Por acontecer' | 'Em andamento' | 'Encerrado') => 
+                            setEventForm(prev => ({ ...prev, status: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Por acontecer">Por acontecer</SelectItem>
+                            <SelectItem value="Em andamento">Em andamento</SelectItem>
+                            <SelectItem value="Encerrado">Encerrado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <MapPin className="h-4 w-4" />
+                        <span>Local: {eventForm.lat.toFixed(6)}, {eventForm.lng.toFixed(6)}</span>
+                      </div>
+                      <Button onClick={handleSaveEvent} className="w-full">
+                        {editingEvent ? 'Atualizar Evento' : 'Criar Evento'}
+                      </Button>
+                    </div>
+                    
+                    {/* Map */}
+                    <div>
+                      <Label>Selecionar Local no Mapa</Label>
+                      <div className="mt-2">
+                        <Map
+                          events={[]}
+                          selectedEvent={null}
+                          onEventSelect={() => {}}
+                          isEditing={true}
+                          onLocationSelect={handleLocationSelect}
                         />
                       </div>
                     </div>
-                    <div>
-                      <Label htmlFor="status">Status</Label>
-                      <Select
-                        value={eventForm.status}
-                        onValueChange={(value: 'Por acontecer' | 'Em andamento' | 'Encerrado') => 
-                          setEventForm(prev => ({ ...prev, status: value }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Por acontecer">Por acontecer</SelectItem>
-                          <SelectItem value="Em andamento">Em andamento</SelectItem>
-                          <SelectItem value="Encerrado">Encerrado</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button onClick={handleSaveEvent} className="w-full">
-                      {editingEvent ? 'Atualizar Evento' : 'Criar Evento'}
-                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -320,9 +399,12 @@ Vamos jogar! 🔥`;
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <span className="text-2xl">
-                          {event.type === 'futebol' ? '⚽' : '🏐'}
+                          {event.type.includes('futebol') && event.type.includes('volei') ? '🏆' :
+                           event.type.includes('futebol') ? '⚽' : '🏐'}
                         </span>
-                        {event.type.charAt(0).toUpperCase() + event.type.slice(1)}
+                        {event.type.split(',').map(sport => 
+                          sport.charAt(0).toUpperCase() + sport.slice(1)
+                        ).join(' + ')}
                       </CardTitle>
                       <div className="flex items-center space-x-2">
                         <Badge className={`${getStatusColor(event.status)} text-white`}>
@@ -403,7 +485,17 @@ Vamos jogar! 🔥`;
                           <p className="font-semibold">{user.username}</p>
                           <p className="text-sm text-gray-500">Senha: {user.password}</p>
                         </div>
-                        <Badge variant="outline">Cliente</Badge>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline">Cliente</Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteUser(user.username)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
