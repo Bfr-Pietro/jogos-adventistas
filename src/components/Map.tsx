@@ -25,7 +25,7 @@ const Map = ({ events, selectedEvent, onEventSelect }: MapProps) => {
     <div className="relative w-full h-96 bg-gradient-to-br from-green-100 to-blue-100 rounded-lg shadow-lg overflow-hidden border-2 border-gray-200">
       {/* Map Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-blue-50">
-        <div className="absolute inset-0 opacity-20 bg-[url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Cpath d="M0 0h100v100H0z" fill="%23f0f0f0"/%3E%3Cpath d="M10 10h80v80H10z" fill="none" stroke="%23ddd" stroke-width="1"/%3E%3C/svg%3E')]"></div>
+        <div className="absolute inset-0 opacity-20 bg-[url('data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"%3E%3Cpath d=\"M0 0h100v100H0z\" fill=\"%23f0f0f0\"/%3E%3Cpath d=\"M10 10h80v80H10z\" fill=\"none\" stroke=\"%23ddd\" stroke-width=\"1\"/%3E%3C/svg%3E')]"></div>
       </div>
       
       {/* Map Title */}
@@ -42,10 +42,10 @@ const Map = ({ events, selectedEvent, onEventSelect }: MapProps) => {
           {events.map((event, index) => {
             const isSelected = selectedEvent?.id === event.id;
             const positions = [
-              { top: '30%', left: '40%' }, // First event
-              { top: '60%', left: '65%' }, // Second event
-              { top: '45%', left: '25%' }, // Third event
-              { top: '70%', left: '45%' }, // Fourth event
+              { top: '30%', left: '40%' },
+              { top: '60%', left: '65%' },
+              { top: '45%', left: '25%' },
+              { top: '70%', left: '45%' },
             ];
             
             const position = positions[index % positions.length];
