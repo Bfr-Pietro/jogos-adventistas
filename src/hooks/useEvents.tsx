@@ -26,29 +26,37 @@ export const useEvents = () => {
 
   const fetchEvents = async () => {
     try {
-      // Fetch events using any type to bypass type checking
-      const { data: eventsData, error: eventsError } = await (supabase as any)
+      // Fetch events with proper error handling
+      const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select('*')
         .order('date', { ascending: true });
 
-      if (eventsError) throw eventsError;
+      if (eventsError) {
+        console.error('Error fetching events:', eventsError);
+        throw new Error('Erro ao carregar eventos');
+      }
 
-      // Fetch confirmations using any type
-      const { data: confirmationsData, error: confirmationsError } = await (supabase as any)
+      // Fetch confirmations with proper error handling
+      const { data: confirmationsData, error: confirmationsError } = await supabase
         .from('event_confirmations')
         .select(`
           event_id,
           profiles!event_confirmations_user_id_fkey(username)
         `);
 
-      if (confirmationsError) throw confirmationsError;
+      if (confirmationsError) {
+        console.error('Error fetching confirmations:', confirmationsError);
+        // Don't throw here, just log the error and continue without confirmations
+      }
 
       // Group confirmations by event
-      const confirmationsByEvent = confirmationsData?.reduce((acc: any, confirmation: any) => {
+      const confirmationsByEvent = confirmationsData?.reduce((acc: Record<string, string[]>, confirmation: any) => {
         const eventId = confirmation.event_id;
         if (!acc[eventId]) acc[eventId] = [];
-        acc[eventId].push(confirmation.profiles?.username);
+        if (confirmation.profiles?.username) {
+          acc[eventId].push(confirmation.profiles.username);
+        }
         return acc;
       }, {} as Record<string, string[]>) || {};
 
@@ -60,10 +68,10 @@ export const useEvents = () => {
 
       setEvents(eventsWithConfirmations);
     } catch (error: any) {
-      console.error('Error fetching events:', error);
+      console.error('Error in fetchEvents:', error);
       toast({
         title: "Erro ao carregar eventos",
-        description: error.message,
+        description: error.message || "Erro desconhecido",
         variant: "destructive"
       });
     } finally {
@@ -72,26 +80,41 @@ export const useEvents = () => {
   };
 
   const confirmPresence = async (eventId: string) => {
-    if (!user) return;
+    if (!user) {
+      toast({
+        title: "Autenticação necessária",
+        description: "Você precisa estar logado para confirmar presença",
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
-      // Check if already confirmed using any type
-      const { data: existing } = await (supabase as any)
+      // Check if already confirmed
+      const { data: existing, error: checkError } = await supabase
         .from('event_confirmations')
         .select('id')
         .eq('event_id', eventId)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking confirmation:', checkError);
+        throw new Error('Erro ao verificar confirmação');
+      }
 
       if (existing) {
         // Remove confirmation
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from('event_confirmations')
           .delete()
           .eq('event_id', eventId)
           .eq('user_id', user.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error removing confirmation:', error);
+          throw new Error('Erro ao cancelar presença');
+        }
 
         toast({
           title: "Presença cancelada",
@@ -99,14 +122,17 @@ export const useEvents = () => {
         });
       } else {
         // Add confirmation
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from('event_confirmations')
           .insert({
             event_id: eventId,
             user_id: user.id
           });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error adding confirmation:', error);
+          throw new Error('Erro ao confirmar presença');
+        }
 
         toast({
           title: "Presença confirmada",
@@ -117,10 +143,10 @@ export const useEvents = () => {
       // Refresh events
       fetchEvents();
     } catch (error: any) {
-      console.error('Error confirming presence:', error);
+      console.error('Error in confirmPresence:', error);
       toast({
         title: "Erro",
-        description: error.message,
+        description: error.message || "Erro desconhecido",
         variant: "destructive"
       });
     }

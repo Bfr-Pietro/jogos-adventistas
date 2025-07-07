@@ -4,12 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Calendar, Clock, Users, ExternalLink, LogOut } from "lucide-react";
-import Header from '@/components/Header';
 import AuthModal from '@/components/AuthModal';
 import Map from '@/components/Map';
 import { useAuth } from '@/hooks/useAuth';
 import { useEvents } from '@/hooks/useEvents';
-import { supabase } from '@/integrations/supabase/client';
+import { sanitizeInput } from '@/utils/validation';
 
 const Index = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -52,21 +51,12 @@ const Index = () => {
     return sports.join(' + ');
   };
 
-  const getUserProfile = async () => {
-    if (!user) return null;
-    
-    const { data } = await (supabase as any)
-      .from('profiles')
-      .select('username')
-      .eq('id', user.id)
-      .single();
-    
-    return data?.username || user.email?.split('@')[0];
-  };
-
   const isUserConfirmed = (event: any) => {
     if (!user) return false;
-    return event.confirmed?.some((username: string) => username === user.email?.split('@')[0]);
+    
+    // Get user's profile data to check confirmation
+    const userProfile = user.email?.split('@')[0] || '';
+    return event.confirmed?.includes(userProfile);
   };
 
   if (authLoading || eventsLoading) {
@@ -93,7 +83,7 @@ const Index = () => {
             {user ? (
               <div className="flex items-center space-x-3">
                 <span className="text-sm text-gray-600">
-                  Olá, {user.email?.split('@')[0]}!
+                  Olá, {sanitizeInput(user.email?.split('@')[0] || 'Usuário')}!
                 </span>
                 <Button
                   variant="outline"
@@ -164,7 +154,7 @@ const Index = () => {
                     <CardContent className="space-y-4">
                       <div className="flex items-start gap-2 text-gray-600">
                         <MapPin className="h-4 w-4 mt-1 text-green-600" />
-                        <span className="text-sm">{event.address}</span>
+                        <span className="text-sm">{sanitizeInput(event.address)}</span>
                       </div>
                       
                       <div className="flex items-center gap-4 text-sm text-gray-600">

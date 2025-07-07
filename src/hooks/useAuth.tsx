@@ -75,9 +75,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     });
     
     if (error) {
+      let errorMessage = "Erro desconhecido";
+      
+      // Provide user-friendly error messages
+      if (error.message.includes('already registered')) {
+        errorMessage = "Este email já está cadastrado";
+      } else if (error.message.includes('invalid email')) {
+        errorMessage = "Email inválido";
+      } else if (error.message.includes('weak password')) {
+        errorMessage = "Senha muito fraca";
+      } else {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Erro no cadastro",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
     } else {
@@ -97,9 +110,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     });
     
     if (error) {
+      let errorMessage = "Erro desconhecido";
+      
+      // Provide user-friendly error messages without revealing user existence
+      if (error.message.includes('Invalid login credentials')) {
+        errorMessage = "Email ou senha incorretos";
+      } else if (error.message.includes('Email not confirmed')) {
+        errorMessage = "Por favor, confirme seu email antes de fazer login";
+      } else {
+        errorMessage = "Erro ao fazer login. Tente novamente.";
+      }
+      
       toast({
         title: "Erro no login",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -112,7 +136,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (error) {
       toast({
         title: "Erro ao sair",
-        description: error.message,
+        description: "Não foi possível sair da conta",
         variant: "destructive"
       });
     } else {
