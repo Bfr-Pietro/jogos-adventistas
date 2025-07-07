@@ -13,7 +13,7 @@ L.Icon.Default.mergeOptions({
 });
 
 interface Event {
-  id: number;
+  id: string;
   type: string;
   address: string;
   date: string;

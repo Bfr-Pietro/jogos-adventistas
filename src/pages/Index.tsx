@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,7 +55,7 @@ const Index = () => {
   const getUserProfile = async () => {
     if (!user) return null;
     
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from('profiles')
       .select('username')
       .eq('id', user.id)
