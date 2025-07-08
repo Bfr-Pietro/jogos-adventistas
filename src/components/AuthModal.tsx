@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { User, UserPlus, AlertCircle, Shield, Users } from "lucide-react";
 import { useAuth } from '@/hooks/useAuth';
 import { useOrganizerAuth } from '@/hooks/useOrganizerAuth';
 import { validateEmail, validateUsername, validatePassword, sanitizeInput } from '@/utils/validation';
+import ForgotPasswordModal from './ForgotPasswordModal';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -26,6 +26,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   const [organizerErrors, setOrganizerErrors] = useState<string[]>([]);
   const [subOrganizerErrors, setSubOrganizerErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   
   const { signIn, signUp } = useAuth();
   const { loginAsOrganizer, loginAsSubOrganizer } = useOrganizerAuth();
@@ -156,7 +157,6 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     if (result.success) {
       onClose();
       setOrganizerForm({ email: '', password: '' });
-      // Redirect to organizer panel
       window.location.href = '/organizer';
     }
   };
@@ -174,7 +174,6 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     if (result.success) {
       onClose();
       setSubOrganizerForm({ email: '', password: '' });
-      // Redirect to organizer panel
       window.location.href = '/organizer';
     }
   };
@@ -198,84 +197,97 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md z-[9999]">
-        <DialogHeader>
-          <DialogTitle className="text-center text-2xl">Acesse sua conta</DialogTitle>
-        </DialogHeader>
-        
-        <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="login" className="flex items-center gap-1 text-xs">
-              <User className="h-3 w-3" />
-              Entrar
-            </TabsTrigger>
-            <TabsTrigger value="signup" className="flex items-center gap-1 text-xs">
-              <UserPlus className="h-3 w-3" />
-              Cadastrar
-            </TabsTrigger>
-            <TabsTrigger value="organizer" className="flex items-center gap-1 text-xs">
-              <Shield className="h-3 w-3" />
-              Organizador
-            </TabsTrigger>
-            <TabsTrigger value="sub-organizer" className="flex items-center gap-1 text-xs">
-              <Users className="h-3 w-3" />
-              Sub-Org
-            </TabsTrigger>
-          </TabsList>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md z-[9999]">
+          <DialogHeader>
+            <DialogTitle className="text-center text-2xl">Acesse sua conta</DialogTitle>
+          </DialogHeader>
           
-          <TabsContent value="login">
-            <Card>
-              <CardHeader className="text-center">
-                <CardTitle className="flex items-center justify-center gap-2">
-                  <User className="h-5 w-5 text-green-600" />
-                  Entrar
-                </CardTitle>
-                <CardDescription>
-                  Entre com sua conta existente
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ErrorDisplay errors={loginErrors} />
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div>
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input
-                      id="login-email"
-                      type="email"
-                      value={loginForm.email}
-                      onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
-                      placeholder="seu@email.com"
-                      className="mt-1"
-                      required
-                      maxLength={254}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="login-password">Senha</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      value={loginForm.password}
-                      onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
-                      placeholder="Digite sua senha"
-                      className="mt-1"
-                      required
-                    />
-                  </div>
-                  
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
-                  >
-                    {isLoading ? 'Entrando...' : 'Entrar'}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
+          <Tabs defaultValue="login" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="login" className="flex items-center gap-1 text-xs">
+                <User className="h-3 w-3" />
+                Entrar
+              </TabsTrigger>
+              <TabsTrigger value="signup" className="flex items-center gap-1 text-xs">
+                <UserPlus className="h-3 w-3" />
+                Cadastrar
+              </TabsTrigger>
+              <TabsTrigger value="organizer" className="flex items-center gap-1 text-xs">
+                <Shield className="h-3 w-3" />
+                Organizador
+              </TabsTrigger>
+              <TabsTrigger value="sub-organizer" className="flex items-center gap-1 text-xs">
+                <Users className="h-3 w-3" />
+                Sub-Org
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="login">
+              <Card>
+                <CardHeader className="text-center">
+                  <CardTitle className="flex items-center justify-center gap-2">
+                    <User className="h-5 w-5 text-green-600" />
+                    Entrar
+                  </CardTitle>
+                  <CardDescription>
+                    Entre com sua conta existente
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ErrorDisplay errors={loginErrors} />
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                      <Label htmlFor="login-email">Email</Label>
+                      <Input
+                        id="login-email"
+                        type="email"
+                        value={loginForm.email}
+                        onChange={(e) => setLoginForm(prev => ({ ...prev, email: e.target.value }))}
+                        placeholder="seu@email.com"
+                        className="mt-1"
+                        required
+                        maxLength={254}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="login-password">Senha</Label>
+                      <Input
+                        id="login-password"
+                        type="password"
+                        value={loginForm.password}
+                        onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
+                        placeholder="Digite sua senha"
+                        className="mt-1"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="text-right">
+                      <Button
+                        type="button"
+                        variant="link"
+                        onClick={() => setIsForgotPasswordOpen(true)}
+                        className="text-sm text-blue-600 hover:text-blue-700 p-0 h-auto"
+                      >
+                        Esqueci minha senha
+                      </Button>
+                    </div>
+                    
+                    <Button 
+                      type="submit" 
+                      disabled={isLoading}
+                      className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+                    >
+                      {isLoading ? 'Entrando...' : 'Entrar'}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            
           <TabsContent value="signup">
             <Card>
               <CardHeader className="text-center">
@@ -450,7 +462,12 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           </TabsContent>
         </Tabs>
       </DialogContent>
-    </Dialog>
+      
+      <ForgotPasswordModal
+        isOpen={isForgotPasswordOpen}
+        onClose={() => setIsForgotPasswordOpen(false)}
+      />
+    </>
   );
 };
 

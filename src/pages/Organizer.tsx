@@ -1,25 +1,26 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Users, MessageCircle, ArrowLeft, MapPin, UserPlus } from "lucide-react";
+import { Plus, Edit, Trash2, Users, MessageCircle, ArrowLeft, MapPin, UserPlus, Calendar } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEvents } from '@/hooks/useEvents';
 import { useSubOrganizers } from '@/hooks/useSubOrganizers';
 import { useOrganizerAuth } from '@/hooks/useOrganizerAuth';
+import CreateEventModal from '@/components/CreateEventModal';
+import UsersTable from '@/components/UsersTable';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import Map from '@/components/Map';
 
 const Organizer = () => {
-  const { events, loading: eventsLoading } = useEvents();
+  const { events, loading: eventsLoading, refetch: refetchEvents } = useEvents();
   const { subOrganizers, loading: subOrganizersLoading, addSubOrganizer, removeSubOrganizer } = useSubOrganizers();
   const { logoutOrganizer, getOrganizerSession } = useOrganizerAuth();
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -30,7 +31,6 @@ const Organizer = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check organizer session
     const session = getOrganizerSession();
     if (!session) {
       navigate('/');
@@ -67,6 +67,10 @@ const Organizer = () => {
     if (window.confirm('Tem certeza que deseja remover este sub-organizador?')) {
       await removeSubOrganizer(id);
     }
+  };
+
+  const handleEventCreated = () => {
+    refetchEvents();
   };
 
   if (!organizerSession) {
@@ -116,10 +120,13 @@ const Organizer = () => {
         </div>
 
         <Tabs defaultValue="events" className="space-y-6">
-          <TabsList className={`grid w-fit ${canManageSubOrganizers ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <TabsList className={`grid w-fit ${canManageSubOrganizers ? 'grid-cols-3' : 'grid-cols-1'}`}>
             <TabsTrigger value="events">Eventos</TabsTrigger>
             {canManageSubOrganizers && (
-              <TabsTrigger value="sub-organizers">Sub-Organizadores</TabsTrigger>
+              <>
+                <TabsTrigger value="sub-organizers">Sub-Organizadores</TabsTrigger>
+                <TabsTrigger value="users">Usuários</TabsTrigger>
+              </>
             )}
           </TabsList>
 
@@ -127,23 +134,13 @@ const Organizer = () => {
           <TabsContent value="events" className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-semibold">Gerenciar Eventos</h2>
-              <Dialog open={isEventModalOpen} onOpenChange={setIsEventModalOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Novo Evento
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Funcionalidade em Desenvolvimento</DialogTitle>
-                  </DialogHeader>
-                  <div className="p-4 text-center text-gray-600">
-                    A funcionalidade de criação de eventos será implementada em breve.
-                    Por enquanto, você pode visualizar os eventos existentes.
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <Button 
+                onClick={() => setIsEventModalOpen(true)}
+                className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Evento
+              </Button>
             </div>
 
             <div className="grid gap-4">
@@ -221,107 +218,168 @@ const Organizer = () => {
 
           {/* Sub-Organizers Tab - Only for main organizer */}
           {canManageSubOrganizers && (
-            <TabsContent value="sub-organizers" className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-semibold">Sub-Organizadores</h2>
-                <Dialog open={isSubOrganizerModalOpen} onOpenChange={setIsSubOrganizerModalOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Adicionar Sub-Organizador
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Adicionar Sub-Organizador</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleAddSubOrganizer} className="space-y-4">
-                      <div>
-                        <Label htmlFor="sub-org-email">Email</Label>
-                        <Input
-                          id="sub-org-email"
-                          type="email"
-                          value={subOrganizerForm.email}
-                          onChange={(e) => setSubOrganizerForm(prev => ({ ...prev, email: e.target.value }))}
-                          placeholder="email@exemplo.com"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="sub-org-password">Senha</Label>
-                        <Input
-                          id="sub-org-password"
-                          type="password"
-                          value={subOrganizerForm.password}
-                          onChange={(e) => setSubOrganizerForm(prev => ({ ...prev, password: e.target.value }))}
-                          placeholder="Digite a senha (min. 6 caracteres)"
-                          required
-                          minLength={6}
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button type="submit" className="flex-1">
-                          Adicionar
-                        </Button>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          onClick={() => setIsSubOrganizerModalOpen(false)}
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              </div>
-              
-              <div className="grid gap-4">
-                {subOrganizersLoading ? (
-                  <Card>
-                    <CardContent className="py-8 text-center text-gray-500">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto mb-4"></div>
-                      Carregando sub-organizadores...
-                    </CardContent>
-                  </Card>
-                ) : subOrganizers.length === 0 ? (
-                  <Card>
-                    <CardContent className="py-8 text-center text-gray-500">
-                      Nenhum sub-organizador cadastrado ainda
-                    </CardContent>
-                  </Card>
-                ) : (
-                  subOrganizers.map((subOrganizer) => (
-                    <Card key={subOrganizer.id}>
-                      <CardContent className="py-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-semibold">{subOrganizer.email}</p>
-                            <p className="text-sm text-gray-500">
-                              Criado em: {new Date(subOrganizer.created_at).toLocaleDateString('pt-BR')}
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Badge variant="outline" className="text-orange-600">Sub-Organizador</Badge>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteSubOrganizer(subOrganizer.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+            <>
+              <TabsContent value="sub-organizers" className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-semibold">Sub-Organizadores</h2>
+                  <Dialog open={isSubOrganizerModalOpen} onOpenChange={setIsSubOrganizerModalOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600">
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Adicionar Sub-Organizador
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Adicionar Sub-Organizador</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleAddSubOrganizer} className="space-y-4">
+                        <div>
+                          <Label htmlFor="sub-org-email">Email</Label>
+                          <Input
+                            id="sub-org-email"
+                            type="email"
+                            value={subOrganizerForm.email}
+                            onChange={(e) => setSubOrganizerForm(prev => ({ ...prev, email: e.target.value }))}
+                            placeholder="email@exemplo.com"
+                            required
+                          />
                         </div>
+                        <div>
+                          <Label htmlFor="sub-org-password">Senha</Label>
+                          <Input
+                            id="sub-org-password"
+                            type="password"
+                            value={subOrganizerForm.password}
+                            onChange={(e) => setSubOrganizerForm(prev => ({ ...prev, password: e.target.value }))}
+                            placeholder="Digite a senha (min. 6 caracteres)"
+                            required
+                            minLength={6}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button type="submit" className="flex-1">
+                            Adicionar
+                          </Button>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => setIsSubOrganizerModalOpen(false)}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                
+                <div className="grid gap-4">
+                  {subOrganizersLoading ? (
+                    <Card>
+                      <CardContent className="py-8 text-center text-gray-500">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto mb-4"></div>
+                        Carregando sub-organizadores...
                       </CardContent>
                     </Card>
-                  ))
-                )}
-              </div>
-            </TabsContent>
+                  ) : subOrganizers.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-8 text-center text-gray-500">
+                        Nenhum sub-organizador cadastrado ainda
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    subOrganizers.map((subOrganizer) => (
+                      <Card key={subOrganizer.id}>
+                        <CardContent className="py-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold">{subOrganizer.email}</p>
+                              <p className="text-sm text-gray-500">
+                                Criado em: {new Date(subOrganizer.created_at).toLocaleDateString('pt-BR')}
+                              </p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="outline" className="text-orange-600">Sub-Organizador</Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteSubOrganizer(subOrganizer.id)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Users Tab - New tab for viewing all users */}
+              <TabsContent value="users" className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-semibold">Usuários do Sistema</h2>
+                </div>
+                <UsersTable />
+              </TabsContent>
+            </>
           )}
         </Tabs>
       </div>
+
+      <CreateEventModal
+        isOpen={isEventModalOpen}
+        onClose={() => setIsEventModalOpen(false)}
+        onEventCreated={handleEventCreated}
+      />
+
+      <Dialog open={isSubOrganizerModalOpen} onOpenChange={setIsSubOrganizerModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adicionar Sub-Organizador</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddSubOrganizer} className="space-y-4">
+            <div>
+              <Label htmlFor="sub-org-email">Email</Label>
+              <Input
+                id="sub-org-email"
+                type="email"
+                value={subOrganizerForm.email}
+                onChange={(e) => setSubOrganizerForm(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="email@exemplo.com"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="sub-org-password">Senha</Label>
+              <Input
+                id="sub-org-password"
+                type="password"
+                value={subOrganizerForm.password}
+                onChange={(e) => setSubOrganizerForm(prev => ({ ...prev, password: e.target.value }))}
+                placeholder="Digite a senha (min. 6 caracteres)"
+                required
+                minLength={6}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" className="flex-1">
+                Adicionar
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setIsSubOrganizerModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
