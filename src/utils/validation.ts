@@ -1,77 +1,87 @@
 
-// Utility functions for input validation and sanitization
+// Sanitization function
+export const sanitizeInput = (input: string): string => {
+  return input.trim().replace(/[<>]/g, '');
+};
+
+// Email validation
 export const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
 
-export const validateUsername = (username: string): boolean => {
-  // Username must be 3-50 characters, alphanumeric and underscore only
-  const usernameRegex = /^[a-zA-Z0-9_]{3,50}$/;
-  return usernameRegex.test(username);
-};
-
-export const validatePassword = (password: string): { isValid: boolean; message: string } => {
-  if (password.length < 8) {
-    return { isValid: false, message: 'A senha deve ter pelo menos 8 caracteres' };
-  }
-  
-  if (!/[a-zA-Z]/.test(password)) {
-    return { isValid: false, message: 'A senha deve conter pelo menos uma letra' };
-  }
-  
-  if (!/[0-9]/.test(password)) {
-    return { isValid: false, message: 'A senha deve conter pelo menos um número' };
-  }
-  
-  return { isValid: true, message: '' };
-};
-
-export const sanitizeInput = (input: string): string => {
-  // Remove potentially dangerous characters and trim whitespace
-  return input.trim().replace(/[<>]/g, '');
-};
-
-export const validateEventData = (data: {
-  type: string;
-  address: string;
-  date: string;
-  time: string;
-  lat: number;
-  lng: number;
-}): { isValid: boolean; errors: string[] } => {
+// Event data validation
+export const validateEventData = (eventData: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
-  
-  // Validate type
-  const validTypes = ['futebol', 'volei', 'futebol,volei', 'volei,futebol'];
-  if (!validTypes.includes(data.type)) {
-    errors.push('Tipo de evento inválido');
+
+  if (!eventData.type || eventData.type.trim() === '') {
+    errors.push('Tipo de evento é obrigatório');
   }
-  
-  // Validate address
-  if (!data.address || data.address.trim().length === 0) {
+
+  if (!eventData.address || eventData.address.trim() === '') {
     errors.push('Endereço é obrigatório');
-  } else if (data.address.length > 200) {
-    errors.push('Endereço muito longo');
   }
-  
-  // Validate coordinates
-  if (data.lat < -90 || data.lat > 90) {
-    errors.push('Latitude inválida');
+
+  if (!eventData.date) {
+    errors.push('Data é obrigatória');
+  } else {
+    // Allow today's date - fix the date validation
+    const selectedDate = new Date(eventData.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      errors.push('A data do evento deve ser hoje ou no futuro');
+    }
   }
-  
-  if (data.lng < -180 || data.lng > 180) {
-    errors.push('Longitude inválida');
+
+  if (!eventData.time) {
+    errors.push('Horário é obrigatório');
   }
-  
-  // Validate date (must be today or future)
-  const eventDate = new Date(data.date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  if (eventDate < today) {
-    errors.push('A data do evento deve ser hoje ou no futuro');
+
+  if (typeof eventData.lat !== 'number' || typeof eventData.lng !== 'number') {
+    errors.push('Coordenadas de localização são obrigatórias');
   }
-  
-  return { isValid: errors.length === 0, errors };
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+// Password strength validation
+export const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (password.length < 6) {
+    errors.push('A senha deve ter pelo menos 6 caracteres');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+// Username validation
+export const validateUsername = (username: string): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!username || username.trim() === '') {
+    errors.push('Nome de usuário é obrigatório');
+  }
+
+  if (username.length < 2) {
+    errors.push('Nome de usuário deve ter pelo menos 2 caracteres');
+  }
+
+  if (username.length > 50) {
+    errors.push('Nome de usuário não pode ter mais de 50 caracteres');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
 };

@@ -24,7 +24,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { email, username, resetUrl }: PasswordResetRequest = await req.json();
 
     const emailResponse = await resend.emails.send({
-      from: "Pietro - Jogos Adventistas <jogosadventistas@gmail.com>",
+      from: "Pietro - Jogos Adventistas <pietro@jogosadventistas.com>",
       to: [email],
       subject: "Recuperação de senha - Jogos Adventistas",
       html: `
@@ -78,7 +78,7 @@ const handler = async (req: Request): Promise<Response> => {
                 <strong>Pietro - Jogos Adventistas</strong>
               </p>
               <p style="color: #6b7280; font-size: 14px; margin: 5px 0;">
-                📧 jogosadventistas@gmail.com
+                📧 pietro@jogosadventistas.com
               </p>
               <p style="color: #6b7280; font-size: 14px; margin: 5px 0;">
                 🌐 jogos-adventistas.vercel.app

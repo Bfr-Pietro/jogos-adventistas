@@ -4,12 +4,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, MapPin, Save, X } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { validateEventData, sanitizeInput } from '@/utils/validation';
+import { useOrganizerAuth } from '@/hooks/useOrganizerAuth';
+import Map from '@/components/Map';
 
 interface CreateEventModalProps {
   isOpen: boolean;
@@ -29,7 +30,9 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
   const [isFutebol, setIsFutebol] = useState(false);
   const [isVolei, setIsVolei] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showMap, setShowMap] = useState(false);
   const { toast } = useToast();
+  const { getOrganizerSession } = useOrganizerAuth();
 
   const handleSportChange = (sport: string, checked: boolean) => {
     if (sport === 'futebol') {
@@ -39,6 +42,15 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
     }
   };
 
+  const handleLocationSelect = (lat: number, lng: number) => {
+    setFormData(prev => ({ ...prev, lat, lng }));
+    setShowMap(false);
+    toast({
+      title: "Localização selecionada",
+      description: "Local do evento atualizado no mapa",
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -46,6 +58,17 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
       toast({
         title: "Erro",
         description: "Selecione pelo menos um esporte",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check organizer session instead of regular user session
+    const organizerSession = getOrganizerSession();
+    if (!organizerSession) {
+      toast({
+        title: "Erro",
+        description: "Você precisa estar logado como organizador para criar eventos",
         variant: "destructive"
       });
       return;
@@ -61,6 +84,21 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
       address: sanitizeInput(formData.address)
     };
 
+    // Fix date validation - allow today's date
+    const selectedDate = new Date(eventData.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      toast({
+        title: "Erro de validação",
+        description: "A data do evento deve ser hoje ou no futuro",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const validation = validateEventData(eventData);
     if (!validation.isValid) {
       toast({
@@ -74,17 +112,8 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
     setIsLoading(true);
     
     try {
-      // Get current user session
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        toast({
-          title: "Erro",
-          description: "Você precisa estar logado para criar eventos",
-          variant: "destructive"
-        });
-        return;
-      }
+      // Create a dummy user ID for organizer-created events
+      const organizerUserId = 'organizer-' + organizerSession.email;
 
       const { error } = await supabase.from('events').insert({
         type: eventData.type,
@@ -93,7 +122,7 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
         time: eventData.time,
         lat: eventData.lat,
         lng: eventData.lng,
-        created_by: session.user.id,
+        created_by: organizerUserId,
         status: 'Por acontecer'
       });
 
@@ -136,7 +165,7 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5 text-green-600" />
@@ -180,6 +209,35 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
                 className="pl-10"
                 required
               />
+            </div>
+          </div>
+
+          <div>
+            <Label>Localização no Mapa</Label>
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowMap(!showMap)}
+                className="w-full"
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                {showMap ? 'Ocultar Mapa' : 'Selecionar no Mapa'}
+              </Button>
+              {showMap && (
+                <div className="border rounded-lg p-2">
+                  <Map
+                    events={[]}
+                    selectedEvent={null}
+                    onEventSelect={() => {}}
+                    isEditing={true}
+                    onLocationSelect={handleLocationSelect}
+                  />
+                  <p className="text-sm text-gray-600 mt-2">
+                    Coordenadas: {formData.lat.toFixed(4)}, {formData.lng.toFixed(4)}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
