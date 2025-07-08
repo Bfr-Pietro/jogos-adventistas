@@ -106,6 +106,33 @@ export type Database = {
         }
         Relationships: []
       }
+      sub_organizers: {
+        Row: {
+          created_at: string
+          created_by: string
+          email: string
+          id: string
+          password: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          email: string
+          id?: string
+          password: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          email?: string
+          id?: string
+          password?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
