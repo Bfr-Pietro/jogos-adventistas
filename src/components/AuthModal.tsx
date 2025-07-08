@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -287,181 +288,181 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
               </Card>
             </TabsContent>
             
-            
-          <TabsContent value="signup">
-            <Card>
-              <CardHeader className="text-center">
-                <CardTitle className="flex items-center justify-center gap-2">
-                  <UserPlus className="h-5 w-5 text-blue-600" />
-                  Criar Conta
-                </CardTitle>
-                <CardDescription>
-                  Crie sua conta para participar dos jogos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ErrorDisplay errors={signupErrors} />
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div>
-                    <Label htmlFor="signup-username">Nome de usuário</Label>
-                    <Input
-                      id="signup-username"
-                      type="text"
-                      value={signupForm.username}
-                      onChange={(e) => setSignupForm(prev => ({ ...prev, username: e.target.value }))}
-                      placeholder="Digite seu nome de usuário"
-                      className="mt-1"
-                      required
-                      maxLength={50}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      3-50 caracteres, apenas letras, números e _
-                    </p>
-                  </div>
-                  <div>
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      value={signupForm.email}
-                      onChange={(e) => setSignupForm(prev => ({ ...prev, email: e.target.value }))}
-                      placeholder="seu@email.com"
-                      className="mt-1"
-                      required
-                      maxLength={254}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="signup-password">Senha</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      value={signupForm.password}
-                      onChange={(e) => setSignupForm(prev => ({ ...prev, password: e.target.value }))}
-                      placeholder="Digite sua senha"
-                      className="mt-1"
-                      required
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Mínimo 8 caracteres, incluindo letras e números
-                    </p>
-                  </div>
-                  
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                  >
-                    {isLoading ? 'Criando...' : 'Criar Conta'}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
+            <TabsContent value="signup">
+              <Card>
+                <CardHeader className="text-center">
+                  <CardTitle className="flex items-center justify-center gap-2">
+                    <UserPlus className="h-5 w-5 text-blue-600" />
+                    Criar Conta
+                  </CardTitle>
+                  <CardDescription>
+                    Crie sua conta para participar dos jogos
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ErrorDisplay errors={signupErrors} />
+                  <form onSubmit={handleSignup} className="space-y-4">
+                    <div>
+                      <Label htmlFor="signup-username">Nome de usuário</Label>
+                      <Input
+                        id="signup-username"
+                        type="text"
+                        value={signupForm.username}
+                        onChange={(e) => setSignupForm(prev => ({ ...prev, username: e.target.value }))}
+                        placeholder="Digite seu nome de usuário"
+                        className="mt-1"
+                        required
+                        maxLength={50}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        3-50 caracteres, apenas letras, números e _
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="signup-email">Email</Label>
+                      <Input
+                        id="signup-email"
+                        type="email"
+                        value={signupForm.email}
+                        onChange={(e) => setSignupForm(prev => ({ ...prev, email: e.target.value }))}
+                        placeholder="seu@email.com"
+                        className="mt-1"
+                        required
+                        maxLength={254}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="signup-password">Senha</Label>
+                      <Input
+                        id="signup-password"
+                        type="password"
+                        value={signupForm.password}
+                        onChange={(e) => setSignupForm(prev => ({ ...prev, password: e.target.value }))}
+                        placeholder="Digite sua senha"
+                        className="mt-1"
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Mínimo 8 caracteres, incluindo letras e números
+                      </p>
+                    </div>
+                    
+                    <Button 
+                      type="submit" 
+                      disabled={isLoading}
+                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                    >
+                      {isLoading ? 'Criando...' : 'Criar Conta'}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-          <TabsContent value="organizer">
-            <Card>
-              <CardHeader className="text-center">
-                <CardTitle className="flex items-center justify-center gap-2">
-                  <Shield className="h-5 w-5 text-purple-600" />
-                  Organizador Principal
-                </CardTitle>
-                <CardDescription>
-                  Acesse o painel administrativo principal
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ErrorDisplay errors={organizerErrors} />
-                <form onSubmit={handleOrganizerLogin} className="space-y-4">
-                  <div>
-                    <Label htmlFor="org-email">Usuário</Label>
-                    <Input
-                      id="org-email"
-                      type="text"
-                      value={organizerForm.email}
-                      onChange={(e) => setOrganizerForm(prev => ({ ...prev, email: e.target.value }))}
-                      placeholder="bfrpietro"
-                      className="mt-1"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="org-password">Senha</Label>
-                    <Input
-                      id="org-password"
-                      type="password"
-                      value={organizerForm.password}
-                      onChange={(e) => setOrganizerForm(prev => ({ ...prev, password: e.target.value }))}
-                      placeholder="190615"
-                      className="mt-1"
-                      required
-                    />
-                  </div>
-                  
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-                  >
-                    {isLoading ? 'Entrando...' : 'Entrar como Organizador'}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
+            <TabsContent value="organizer">
+              <Card>
+                <CardHeader className="text-center">
+                  <CardTitle className="flex items-center justify-center gap-2">
+                    <Shield className="h-5 w-5 text-purple-600" />
+                    Organizador Principal
+                  </CardTitle>
+                  <CardDescription>
+                    Acesse o painel administrativo principal
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ErrorDisplay errors={organizerErrors} />
+                  <form onSubmit={handleOrganizerLogin} className="space-y-4">
+                    <div>
+                      <Label htmlFor="org-email">Usuário</Label>
+                      <Input
+                        id="org-email"
+                        type="text"
+                        value={organizerForm.email}
+                        onChange={(e) => setOrganizerForm(prev => ({ ...prev, email: e.target.value }))}
+                        placeholder="bfrpietro"
+                        className="mt-1"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="org-password">Senha</Label>
+                      <Input
+                        id="org-password"
+                        type="password"
+                        value={organizerForm.password}
+                        onChange={(e) => setOrganizerForm(prev => ({ ...prev, password: e.target.value }))}
+                        placeholder="190615"
+                        className="mt-1"
+                        required
+                      />
+                    </div>
+                    
+                    <Button 
+                      type="submit" 
+                      disabled={isLoading}
+                      className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                    >
+                      {isLoading ? 'Entrando...' : 'Entrar como Organizador'}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-          <TabsContent value="sub-organizer">
-            <Card>
-              <CardHeader className="text-center">
-                <CardTitle className="flex items-center justify-center gap-2">
-                  <Users className="h-5 w-5 text-orange-600" />
-                  Sub-Organizador
-                </CardTitle>
-                <CardDescription>
-                  Acesse como sub-organizador
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ErrorDisplay errors={subOrganizerErrors} />
-                <form onSubmit={handleSubOrganizerLogin} className="space-y-4">
-                  <div>
-                    <Label htmlFor="sub-org-email">Email</Label>
-                    <Input
-                      id="sub-org-email"
-                      type="email"
-                      value={subOrganizerForm.email}
-                      onChange={(e) => setSubOrganizerForm(prev => ({ ...prev, email: e.target.value }))}
-                      placeholder="email@exemplo.com"
-                      className="mt-1"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="sub-org-password">Senha</Label>
-                    <Input
-                      id="sub-org-password"
-                      type="password"
-                      value={subOrganizerForm.password}
-                      onChange={(e) => setSubOrganizerForm(prev => ({ ...prev, password: e.target.value }))}
-                      placeholder="Digite sua senha"
-                      className="mt-1"
-                      required
-                    />
-                  </div>
-                  
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"
-                  >
-                    {isLoading ? 'Entrando...' : 'Entrar como Sub-Organizador'}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
+            <TabsContent value="sub-organizer">
+              <Card>
+                <CardHeader className="text-center">
+                  <CardTitle className="flex items-center justify-center gap-2">
+                    <Users className="h-5 w-5 text-orange-600" />
+                    Sub-Organizador
+                  </CardTitle>
+                  <CardDescription>
+                    Acesse como sub-organizador
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ErrorDisplay errors={subOrganizerErrors} />
+                  <form onSubmit={handleSubOrganizerLogin} className="space-y-4">
+                    <div>
+                      <Label htmlFor="sub-org-email">Email</Label>
+                      <Input
+                        id="sub-org-email"
+                        type="email"
+                        value={subOrganizerForm.email}
+                        onChange={(e) => setSubOrganizerForm(prev => ({ ...prev, email: e.target.value }))}
+                        placeholder="email@exemplo.com"
+                        className="mt-1"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="sub-org-password">Senha</Label>
+                      <Input
+                        id="sub-org-password"
+                        type="password"
+                        value={subOrganizerForm.password}
+                        onChange={(e) => setSubOrganizerForm(prev => ({ ...prev, password: e.target.value }))}
+                        placeholder="Digite sua senha"
+                        className="mt-1"
+                        required
+                      />
+                    </div>
+                    
+                    <Button 
+                      type="submit" 
+                      disabled={isLoading}
+                      className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"
+                    >
+                      {isLoading ? 'Entrando...' : 'Entrar como Sub-Organizador'}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
       
       <ForgotPasswordModal
         isOpen={isForgotPasswordOpen}
