@@ -26,7 +26,9 @@ export const useEvents = () => {
 
   const fetchEvents = async () => {
     try {
-      // Fetch events with proper error handling
+      setLoading(true);
+      
+      // Simple query without complex joins to avoid LockManager issues
       const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select('*')
@@ -37,43 +39,52 @@ export const useEvents = () => {
         throw new Error('Erro ao carregar eventos');
       }
 
-      // Fetch confirmations with proper error handling
-      const { data: confirmationsData, error: confirmationsError } = await supabase
-        .from('event_confirmations')
-        .select(`
-          event_id,
-          profiles!event_confirmations_user_id_fkey(username)
-        `);
-
-      if (confirmationsError) {
-        console.error('Error fetching confirmations:', confirmationsError);
-        // Don't throw here, just log the error and continue without confirmations
+      if (!eventsData) {
+        setEvents([]);
+        return;
       }
 
-      // Group confirmations by event
-      const confirmationsByEvent = confirmationsData?.reduce((acc: Record<string, string[]>, confirmation: any) => {
-        const eventId = confirmation.event_id;
-        if (!acc[eventId]) acc[eventId] = [];
-        if (confirmation.profiles?.username) {
-          acc[eventId].push(confirmation.profiles.username);
+      // Fetch confirmations separately and safely
+      let confirmationsByEvent: Record<string, string[]> = {};
+      
+      try {
+        const { data: confirmationsData } = await supabase
+          .from('event_confirmations')
+          .select(`
+            event_id,
+            profiles!event_confirmations_user_id_fkey(username)
+          `);
+
+        if (confirmationsData) {
+          confirmationsByEvent = confirmationsData.reduce((acc: Record<string, string[]>, confirmation: any) => {
+            const eventId = confirmation.event_id;
+            if (!acc[eventId]) acc[eventId] = [];
+            if (confirmation.profiles?.username) {
+              acc[eventId].push(confirmation.profiles.username);
+            }
+            return acc;
+          }, {} as Record<string, string[]>);
         }
-        return acc;
-      }, {} as Record<string, string[]>) || {};
+      } catch (confirmError) {
+        console.warn('Could not fetch confirmations:', confirmError);
+        // Continue without confirmations rather than failing
+      }
 
       // Combine events with confirmations
-      const eventsWithConfirmations = eventsData?.map((event: any) => ({
+      const eventsWithConfirmations = eventsData.map((event: any) => ({
         ...event,
         confirmed: confirmationsByEvent[event.id] || []
-      })) || [];
+      }));
 
       setEvents(eventsWithConfirmations);
     } catch (error: any) {
       console.error('Error in fetchEvents:', error);
       toast({
         title: "Erro ao carregar eventos",
-        description: error.message || "Erro desconhecido",
+        description: "Tente recarregar a página",
         variant: "destructive"
       });
+      setEvents([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -141,7 +152,7 @@ export const useEvents = () => {
       }
 
       // Refresh events
-      fetchEvents();
+      await fetchEvents();
     } catch (error: any) {
       console.error('Error in confirmPresence:', error);
       toast({
@@ -155,32 +166,43 @@ export const useEvents = () => {
   useEffect(() => {
     fetchEvents();
 
-    // Set up real-time subscriptions
-    const eventsSubscription = supabase
-      .channel('events-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'events'
-      }, () => {
-        fetchEvents();
-      })
-      .subscribe();
+    // Set up real-time subscriptions with error handling
+    let eventsSubscription: any;
+    let confirmationsSubscription: any;
 
-    const confirmationsSubscription = supabase
-      .channel('confirmations-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'event_confirmations'
-      }, () => {
-        fetchEvents();
-      })
-      .subscribe();
+    try {
+      eventsSubscription = supabase
+        .channel('events-changes')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'events'
+        }, () => {
+          fetchEvents();
+        })
+        .subscribe();
+
+      confirmationsSubscription = supabase
+        .channel('confirmations-changes')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'event_confirmations'
+        }, () => {
+          fetchEvents();
+        })
+        .subscribe();
+    } catch (subscriptionError) {
+      console.warn('Could not set up real-time subscriptions:', subscriptionError);
+    }
 
     return () => {
-      supabase.removeChannel(eventsSubscription);
-      supabase.removeChannel(confirmationsSubscription);
+      try {
+        if (eventsSubscription) supabase.removeChannel(eventsSubscription);
+        if (confirmationsSubscription) supabase.removeChannel(confirmationsSubscription);
+      } catch (cleanupError) {
+        console.warn('Error cleaning up subscriptions:', cleanupError);
+      }
     };
   }, []);
 

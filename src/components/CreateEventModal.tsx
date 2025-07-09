@@ -54,6 +54,7 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate sports selection
     if (!isFutebol && !isVolei) {
       toast({
         title: "Erro",
@@ -63,17 +64,18 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
       return;
     }
 
-    // Check organizer session instead of regular user session
+    // Check organizer session
     const organizerSession = getOrganizerSession();
     if (!organizerSession) {
       toast({
-        title: "Erro",
+        title: "Erro de Autenticação",
         description: "Você precisa estar logado como organizador para criar eventos",
         variant: "destructive"
       });
       return;
     }
 
+    // Prepare sports data
     const sports = [];
     if (isFutebol) sports.push('futebol');
     if (isVolei) sports.push('volei');
@@ -84,7 +86,7 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
       address: sanitizeInput(formData.address)
     };
 
-    // Fix date validation - allow today's date
+    // Enhanced date validation - allow today's date
     const selectedDate = new Date(eventData.date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -99,6 +101,7 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
       return;
     }
 
+    // Validate all event data
     const validation = validateEventData(eventData);
     if (!validation.isValid) {
       toast({
@@ -112,10 +115,12 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
     setIsLoading(true);
     
     try {
-      // Create a dummy user ID for organizer-created events
-      const organizerUserId = 'organizer-' + organizerSession.email;
+      // Create organizer user ID - improved security
+      const organizerUserId = `org_${organizerSession.type}_${organizerSession.email.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-      const { error } = await supabase.from('events').insert({
+      console.log('Creating event with organizer ID:', organizerUserId);
+
+      const { data, error } = await supabase.from('events').insert({
         type: eventData.type,
         address: eventData.address,
         date: eventData.date,
@@ -124,38 +129,45 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
         lng: eventData.lng,
         created_by: organizerUserId,
         status: 'Por acontecer'
-      });
+      }).select();
 
       if (error) {
-        console.error('Error creating event:', error);
+        console.error('Supabase error creating event:', error);
         toast({
           title: "Erro",
-          description: "Erro ao criar evento. Tente novamente.",
+          description: `Erro ao criar evento: ${error.message}`,
           variant: "destructive"
         });
-      } else {
-        toast({
-          title: "Sucesso",
-          description: "Evento criado com sucesso!",
-        });
-        onEventCreated();
-        onClose();
-        setFormData({
-          type: '',
-          address: '',
-          date: '',
-          time: '',
-          lat: -23.5505,
-          lng: -46.6333
-        });
-        setIsFutebol(false);
-        setIsVolei(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error creating event:', error);
+
+      console.log('Event created successfully:', data);
+
+      toast({
+        title: "Sucesso",
+        description: "Evento criado com sucesso!",
+      });
+
+      // Reset form
+      setFormData({
+        type: '',
+        address: '',
+        date: '',
+        time: '',
+        lat: -23.5505,
+        lng: -46.6333
+      });
+      setIsFutebol(false);
+      setIsVolei(false);
+      
+      onEventCreated();
+      onClose();
+
+    } catch (error: any) {
+      console.error('Unexpected error creating event:', error);
       toast({
         title: "Erro",
-        description: "Erro inesperado ao criar evento",
+        description: "Erro inesperado ao criar evento. Tente novamente.",
         variant: "destructive"
       });
     } finally {
@@ -208,6 +220,7 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
                 placeholder="Digite o endereço do evento"
                 className="pl-10"
                 required
+                maxLength={200}
               />
             </div>
           </div>

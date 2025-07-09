@@ -23,8 +23,22 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { email, username, resetUrl }: PasswordResetRequest = await req.json();
 
+    // Input validation for security
+    if (!email || !username || !resetUrl) {
+      throw new Error("Missing required fields");
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error("Invalid email format");
+    }
+
+    // Sanitize username
+    const sanitizedUsername = username.replace(/[<>]/g, '').slice(0, 100);
+
     const emailResponse = await resend.emails.send({
-      from: "Pietro - Jogos Adventistas <pietro@jogosadventistas.com>",
+      from: "Jogos Adventistas <jogosadventistas@gmail.com>",
       to: [email],
       subject: "Recuperação de senha - Jogos Adventistas",
       html: `
@@ -34,7 +48,7 @@ const handler = async (req: Request): Promise<Response> => {
               ⚽ Jogos Adventistas 🏐
             </h1>
             
-            <h2 style="color: #1f2937; margin-bottom: 20px;">Olá ${username},</h2>
+            <h2 style="color: #1f2937; margin-bottom: 20px;">Olá ${sanitizedUsername},</h2>
             
             <p style="color: #4b5563; line-height: 1.6; margin-bottom: 20px;">
               Recebemos uma solicitação para redefinir a sua senha no <strong>Jogos Adventistas</strong>, 
@@ -75,13 +89,10 @@ const handler = async (req: Request): Promise<Response> => {
             <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 30px;">
               <p style="color: #4b5563; margin-bottom: 10px;">
                 Um forte abraço,<br>
-                <strong>Pietro - Jogos Adventistas</strong>
+                <strong>Equipe Jogos Adventistas</strong>
               </p>
               <p style="color: #6b7280; font-size: 14px; margin: 5px 0;">
-                📧 pietro@jogosadventistas.com
-              </p>
-              <p style="color: #6b7280; font-size: 14px; margin: 5px 0;">
-                🌐 jogos-adventistas.vercel.app
+                📧 jogosadventistas@gmail.com
               </p>
             </div>
           </div>
@@ -101,7 +112,7 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error in send-password-reset function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "Failed to send email" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
