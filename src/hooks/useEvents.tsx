@@ -1,167 +1,125 @@
 
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { useOrganizerAuth } from './useOrganizerAuth';
-import { useToast } from './use-toast';
+import { useToast } from '@/hooks/use-toast';
 
-interface Event {
+export interface Event {
   id: string;
   type: string;
   address: string;
   date: string;
   time: string;
+  status: 'Por acontecer' | 'Em andamento' | 'Encerrado';
   lat: number;
   lng: number;
-  status: string;
   created_by: string;
   created_at: string;
-  updated_at: string;
-  confirmed?: string[];
-}
-
-interface CreateEventData {
-  type: string;
-  address: string;
-  date: string;
-  time: string;
-  lat: number;
-  lng: number;
+  confirmed: string[];
 }
 
 export const useEvents = () => {
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-  const { organizerSession } = useOrganizerAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const { data: events = [], isLoading: loading, refetch } = useQuery({
-    queryKey: ['events'],
-    queryFn: async () => {
-      console.log('Fetching events...');
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
       
-      // Fetch events
+      // Simple query to get all events
       const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('date', { ascending: true });
 
       if (eventsError) {
         console.error('Error fetching events:', eventsError);
-        throw eventsError;
+        toast({
+          title: "Erro ao carregar eventos",
+          description: "Tente recarregar a página",
+          variant: "destructive"
+        });
+        setEvents([]);
+        return;
       }
 
-      // Fetch confirmations for each event
-      const eventsWithConfirmations = await Promise.all(
-        eventsData.map(async (event) => {
-          const { data: confirmations, error: confirmError } = await supabase
-            .from('event_confirmations')
-            .select('user_id')
-            .eq('event_id', event.id);
+      if (!eventsData) {
+        setEvents([]);
+        return;
+      }
 
-          if (confirmError) {
-            console.error('Error fetching confirmations:', confirmError);
-            return { ...event, confirmed: [] };
-          }
-
-          // Get user profiles for confirmed users
-          const confirmedUsers = await Promise.all(
-            confirmations.map(async (confirmation) => {
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('username')
-                .eq('id', confirmation.user_id)
-                .single();
-
-              return profile?.username || confirmation.user_id.split('@')[0] || 'Usuário';
-            })
-          );
-
-          return {
-            ...event,
-            confirmed: confirmedUsers
-          };
-        })
-      );
-
-      console.log('Events with confirmations:', eventsWithConfirmations);
-      return eventsWithConfirmations;
-    },
-    refetchInterval: 30000, // Refetch every 30 seconds
-  });
-
-  const createEventMutation = useMutation({
-    mutationFn: async (eventData: CreateEventData) => {
-      console.log('Creating event with data:', eventData);
+      // Fetch confirmations separately and safely
+      let confirmationsByEvent: Record<string, string[]> = {};
       
-      // Get the current user ID for created_by
-      let createdBy = '';
-      
-      if (organizerSession) {
-        // For organizers, use their session ID
-        createdBy = organizerSession.id || 'organizer_bfrpietro';
-      } else if (user) {
-        // For regular users, use their user ID
-        createdBy = user.id;
-      } else {
-        throw new Error('User not authenticated');
+      try {
+        const { data: confirmationsData } = await supabase
+          .from('event_confirmations')
+          .select(`
+            event_id,
+            profiles!event_confirmations_user_id_fkey(username)
+          `);
+
+        if (confirmationsData) {
+          confirmationsByEvent = confirmationsData.reduce((acc: Record<string, string[]>, confirmation: any) => {
+            const eventId = confirmation.event_id;
+            if (!acc[eventId]) acc[eventId] = [];
+            if (confirmation.profiles?.username) {
+              acc[eventId].push(confirmation.profiles.username);
+            }
+            return acc;
+          }, {} as Record<string, string[]>);
+        }
+      } catch (confirmError) {
+        console.warn('Could not fetch confirmations:', confirmError);
       }
 
-      console.log('Created by:', createdBy);
+      // Combine events with confirmations
+      const eventsWithConfirmations = eventsData.map((event: any) => ({
+        ...event,
+        confirmed: confirmationsByEvent[event.id] || []
+      }));
 
-      const { data, error } = await supabase
-        .from('events')
-        .insert([
-          {
-            ...eventData,
-            created_by: createdBy,
-            status: 'Por acontecer'
-          }
-        ])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating event:', error);
-        throw error;
-      }
-
-      console.log('Event created successfully:', data);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['events'] });
+      setEvents(eventsWithConfirmations);
+    } catch (error: any) {
+      console.error('Error in fetchEvents:', error);
       toast({
-        title: "Sucesso!",
-        description: "Evento criado com sucesso",
+        title: "Erro ao carregar eventos",
+        description: "Tente recarregar a página",
+        variant: "destructive"
       });
-    },
-    onError: (error: any) => {
-      console.error('Error creating event:', error);
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirmPresence = async (eventId: string) => {
+    if (!user) {
       toast({
-        title: "Erro ao criar evento",
-        description: error.message || "Ocorreu um erro inesperado",
-        variant: "destructive",
+        title: "Autenticação necessária",
+        description: "Você precisa estar logado para confirmar presença",
+        variant: "destructive"
       });
-    },
-  });
+      return;
+    }
 
-  const confirmPresenceMutation = useMutation({
-    mutationFn: async (eventId: string) => {
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      // Check if user is already confirmed
-      const { data: existingConfirmation } = await supabase
+    try {
+      // Check if already confirmed
+      const { data: existing, error: checkError } = await supabase
         .from('event_confirmations')
-        .select('*')
+        .select('id')
         .eq('event_id', eventId)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (existingConfirmation) {
+      if (checkError) {
+        console.error('Error checking confirmation:', checkError);
+        throw new Error('Erro ao verificar confirmação');
+      }
+
+      if (existing) {
         // Remove confirmation
         const { error } = await supabase
           .from('event_confirmations')
@@ -169,49 +127,83 @@ export const useEvents = () => {
           .eq('event_id', eventId)
           .eq('user_id', user.id);
 
-        if (error) throw error;
-        return { action: 'removed' };
+        if (error) {
+          console.error('Error removing confirmation:', error);
+          throw new Error('Erro ao cancelar presença');
+        }
+
+        toast({
+          title: "Presença cancelada",
+          description: "Sua presença foi cancelada com sucesso",
+        });
       } else {
         // Add confirmation
         const { error } = await supabase
           .from('event_confirmations')
-          .insert([
-            {
-              event_id: eventId,
-              user_id: user.id
-            }
-          ]);
+          .insert({
+            event_id: eventId,
+            user_id: user.id
+          });
 
-        if (error) throw error;
-        return { action: 'added' };
+        if (error) {
+          console.error('Error adding confirmation:', error);
+          throw new Error('Erro ao confirmar presença');
+        }
+
+        toast({
+          title: "Presença confirmada",
+          description: "Sua presença foi confirmada com sucesso!",
+        });
       }
-    },
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['events'] });
-      toast({
-        title: result.action === 'added' ? "Presença confirmada!" : "Presença cancelada",
-        description: result.action === 'added' 
-          ? "Sua presença foi confirmada para este evento" 
-          : "Sua presença foi cancelada",
-      });
-    },
-    onError: (error: any) => {
-      console.error('Error confirming presence:', error);
+
+      // Refresh events
+      await fetchEvents();
+    } catch (error: any) {
+      console.error('Error in confirmPresence:', error);
       toast({
         title: "Erro",
-        description: error.message || "Ocorreu um erro inesperado",
-        variant: "destructive",
+        description: error.message || "Erro desconhecido",
+        variant: "destructive"
       });
-    },
-  });
+    }
+  };
+
+  useEffect(() => {
+    fetchEvents();
+
+    // Set up real-time subscriptions
+    const eventsSubscription = supabase
+      .channel('events-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'events'
+      }, () => {
+        fetchEvents();
+      })
+      .subscribe();
+
+    const confirmationsSubscription = supabase
+      .channel('confirmations-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'event_confirmations'
+      }, () => {
+        fetchEvents();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(eventsSubscription);
+      supabase.removeChannel(confirmationsSubscription);
+    };
+  }, []);
 
   return {
     events,
     loading,
-    refetch,
-    createEvent: createEventMutation.mutate,
-    confirmPresence: confirmPresenceMutation.mutate,
-    isCreating: createEventMutation.isPending,
-    isConfirming: confirmPresenceMutation.isPending,
+    confirmPresence,
+    refetch: fetchEvents
   };
 };

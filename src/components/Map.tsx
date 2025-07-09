@@ -1,9 +1,16 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { MapPin, Calendar, Clock, Users } from "lucide-react";
+import React, { useEffect, useRef } from 'react';
+import { MapPin } from 'lucide-react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix for default markers in Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 interface Event {
   id: string;
@@ -11,171 +18,224 @@ interface Event {
   address: string;
   date: string;
   time: string;
+  status: 'Por acontecer' | 'Em andamento' | 'Encerrado';
   lat: number;
   lng: number;
-  status: string;
-  confirmed?: string[];
+  confirmed: string[];
 }
 
 interface MapProps {
   events: Event[];
-  selectedEvent?: Event | null;
-  onEventSelect?: (event: Event) => void;
+  selectedEvent: Event | null;
+  onEventSelect: (event: Event) => void;
+  isEditing?: boolean;
+  onLocationSelect?: (lat: number, lng: number) => void;
+  selectedLocation?: { lat: number; lng: number };
 }
 
-const mapContainerStyle = {
-  width: '100%',
-  height: '400px'
-};
+const Map = ({ events, selectedEvent, onEventSelect, isEditing, onLocationSelect, selectedLocation }: MapProps) => {
+  const mapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const selectedMarkerRef = useRef<L.Marker | null>(null);
 
-const defaultCenter = {
-  lat: -23.5505,
-  lng: -46.6333
-};
-
-const Map = ({ events, selectedEvent, onEventSelect }: MapProps) => {
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [infoWindow, setInfoWindow] = useState<Event | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  const onLoad = useCallback((map: google.maps.Map) => {
-    setMap(map);
-    setIsLoaded(true);
-  }, []);
-
-  const onUnmount = useCallback(() => {
-    setMap(null);
-    setIsLoaded(false);
-  }, []);
-
-  const handleMarkerClick = (event: Event) => {
-    setInfoWindow(event);
-    onEventSelect?.(event);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Por acontecer': return 'bg-blue-500';
-      case 'Em andamento': return 'bg-green-500';
-      case 'Encerrado': return 'bg-gray-500';
-      default: return 'bg-blue-500';
-    }
-  };
-
-  const getGameIcon = (type: string) => {
-    if (type.includes('futebol') && type.includes('volei')) return '🏆';
-    return type.includes('futebol') ? '⚽' : '🏐';
-  };
-
-  const getGameName = (type: string) => {
-    const sports = type.split(',').map(sport => 
-      sport.charAt(0).toUpperCase() + sport.slice(1)
-    );
-    return sports.join(' + ');
-  };
-
-  // Create custom marker icon
-  const createCustomMarker = (type: string) => {
-    const icon = getGameIcon(type);
-    return {
-      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-        <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="20" cy="20" r="18" fill="#10B981" stroke="#ffffff" stroke-width="2"/>
-          <text x="20" y="28" text-anchor="middle" font-size="16" fill="white">${icon}</text>
-        </svg>
-      `)}`,
-      scaledSize: new google.maps.Size(40, 40),
-      anchor: new google.maps.Point(20, 20)
-    };
-  };
-
-  // Focus on selected event
   useEffect(() => {
-    if (selectedEvent && map && isLoaded) {
-      map.panTo({ lat: selectedEvent.lat, lng: selectedEvent.lng });
-      map.setZoom(15);
-      setInfoWindow(selectedEvent);
-    }
-  }, [selectedEvent, map, isLoaded]);
+    if (!mapContainerRef.current) return;
 
-  const handleLoadError = () => {
-    console.error('Google Maps failed to load');
-  };
+    // Initialize map
+    mapRef.current = L.map(mapContainerRef.current).setView([-23.5505, -46.6333], 12);
+
+    // Add tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(mapRef.current);
+
+    // Add click handler for editing mode
+    if (isEditing && onLocationSelect) {
+      mapRef.current.on('click', (e) => {
+        const { lat, lng } = e.latlng;
+        onLocationSelect(lat, lng);
+      });
+    }
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+      }
+    };
+  }, [isEditing, onLocationSelect]);
+
+  // Handle selected location marker for editing mode
+  useEffect(() => {
+    if (!mapRef.current || !isEditing || !selectedLocation) return;
+
+    // Remove existing selected marker
+    if (selectedMarkerRef.current) {
+      mapRef.current.removeLayer(selectedMarkerRef.current);
+    }
+
+    // Create custom icon for selected location
+    const selectedIcon = L.divIcon({
+      html: `<div style="
+        background: #EF4444;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        border: 3px solid white;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        transform: scale(1.2);
+        z-index: 1000;
+      ">📍</div>`,
+      className: 'custom-selected-marker',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15]
+    });
+
+    // Add selected location marker
+    selectedMarkerRef.current = L.marker([selectedLocation.lat, selectedLocation.lng], { icon: selectedIcon })
+      .addTo(mapRef.current)
+      .bindPopup(`
+        <div style="text-align: center; min-width: 150px;">
+          <h3 style="margin: 0 0 10px 0; font-weight: bold; color: #EF4444;">
+            📍 Local Selecionado
+          </h3>
+          <p style="margin: 5px 0; font-size: 12px; color: #666;">
+            Lat: ${selectedLocation.lat.toFixed(4)}<br>
+            Lng: ${selectedLocation.lng.toFixed(4)}
+          </p>
+        </div>
+      `)
+      .openPopup();
+
+    // Center map on selected location
+    mapRef.current.setView([selectedLocation.lat, selectedLocation.lng], 15);
+
+  }, [selectedLocation, isEditing]);
+
+  useEffect(() => {
+    if (!mapRef.current || isEditing) return;
+
+    // Clear existing markers (except selected location marker)
+    mapRef.current.eachLayer((layer) => {
+      if (layer instanceof L.Marker && layer !== selectedMarkerRef.current) {
+        mapRef.current?.removeLayer(layer);
+      }
+    });
+
+    // Add markers for each event
+    events.forEach((event) => {
+      if (!mapRef.current) return;
+
+      const isSelected = selectedEvent?.id === event.id;
+      
+      // Create custom icon based on sport type
+      const sportIcons: { [key: string]: string } = {
+        'futebol': '⚽',
+        'volei': '🏐',
+        'futebol,volei': '🏆',
+        'volei,futebol': '🏆'
+      };
+
+      const icon = L.divIcon({
+        html: `<div style="
+          background: ${event.type.includes('futebol') && event.type.includes('volei') ? '#8B5CF6' : 
+                     event.type.includes('futebol') ? '#10B981' : '#3B82F6'};
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          border: 3px solid white;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          ${isSelected ? 'transform: scale(1.2); z-index: 1000;' : ''}
+        ">${sportIcons[event.type] || '🏆'}</div>`,
+        className: 'custom-marker',
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
+      });
+
+      const marker = L.marker([event.lat, event.lng], { icon })
+        .addTo(mapRef.current)
+        .on('click', () => {
+          onEventSelect(event);
+        });
+
+      // Add popup with event info
+      marker.bindPopup(`
+        <div style="text-align: center; min-width: 200px;">
+          <h3 style="margin: 0 0 10px 0; font-weight: bold;">
+            ${event.type.split(',').map(sport => 
+              sport.charAt(0).toUpperCase() + sport.slice(1)
+            ).join(' + ')}
+          </h3>
+          <p style="margin: 5px 0;"><strong>Data:</strong> ${new Date(event.date).toLocaleDateString('pt-BR')}</p>
+          <p style="margin: 5px 0;"><strong>Horário:</strong> ${event.time}</p>
+          <p style="margin: 5px 0;"><strong>Status:</strong> ${event.status}</p>
+          <button onclick="window.open('https://www.google.com/maps?q=${event.lat},${event.lng}', '_blank')" 
+                  style="
+                    background: #4285f4;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    margin-top: 10px;
+                    font-weight: bold;
+                  ">
+            Abrir no Google Maps
+          </button>
+        </div>
+      `);
+
+      if (isSelected) {
+        marker.openPopup();
+        mapRef.current.setView([event.lat, event.lng], 15);
+      }
+    });
+  }, [events, selectedEvent, onEventSelect, isEditing]);
 
   return (
-    <div className="w-full h-full rounded-lg overflow-hidden shadow-lg">
-      <LoadScript
-        googleMapsApiKey="AIzaSyDxQKcWgHcRlLjEYjTrv_tYLdLJHoFCqYQ"
-        onError={handleLoadError}
-      >
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          center={defaultCenter}
-          zoom={11}
-          onLoad={onLoad}
-          onUnmount={onUnmount}
-          options={{
-            zoomControl: true,
-            streetViewControl: false,
-            mapTypeControl: false,
-            fullscreenControl: false,
-          }}
-        >
-          {events.map((event) => (
-            <Marker
-              key={event.id}
-              position={{ lat: event.lat, lng: event.lng }}
-              icon={createCustomMarker(event.type)}
-              onClick={() => handleMarkerClick(event)}
-              title={`${getGameName(event.type)} - ${event.address}`}
-            />
-          ))}
-
-          {infoWindow && (
-            <InfoWindow
-              position={{ lat: infoWindow.lat, lng: infoWindow.lng }}
-              onCloseClick={() => setInfoWindow(null)}
-            >
-              <Card className="w-64 border-none shadow-none">
-                <CardContent className="p-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-sm flex items-center gap-1">
-                        <span>{getGameIcon(infoWindow.type)}</span>
-                        {getGameName(infoWindow.type)}
-                      </h3>
-                      <Badge className={`${getStatusColor(infoWindow.status)} text-white text-xs`}>
-                        {infoWindow.status}
-                      </Badge>
-                    </div>
-                    
-                    <div className="flex items-start gap-1 text-xs text-gray-600">
-                      <MapPin className="h-3 w-3 mt-0.5 text-green-600" />
-                      <span>{infoWindow.address}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-3 text-xs text-gray-600">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-blue-600" />
-                        <span>{new Date(infoWindow.date).toLocaleDateString('pt-BR')}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-blue-600" />
-                        <span>{infoWindow.time}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-1 text-xs text-gray-600">
-                      <Users className="h-3 w-3 text-green-600" />
-                      <span>{infoWindow.confirmed?.length || 0} confirmados</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </InfoWindow>
+    <div className="relative w-full h-96 rounded-lg shadow-lg overflow-hidden border-2 border-gray-200">
+      {/* Map Title */}
+      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md z-[1000]">
+        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-green-600" />
+          {isEditing ? 'Clique no mapa para selecionar local' : 'Mapa dos Jogos'}
+        </h3>
+      </div>
+      
+      {/* Map Container */}
+      <div ref={mapContainerRef} className="w-full h-full" />
+      
+      {/* Map Legend */}
+      <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md z-[1000]">
+        <div className="text-xs font-semibold text-gray-700 mb-2">Legenda</div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            <span>Futebol</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+            <span>Vôlei</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+            <span>Ambos</span>
+          </div>
+          {isEditing && (
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              <span>Selecionado</span>
+            </div>
           )}
-        </GoogleMap>
-      </LoadScript>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,120 +1,181 @@
 
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { sanitizeInput, validateEmail } from '@/utils/validation';
 
-interface OrganizerSession {
-  email: string;
-  type: 'organizer' | 'sub_organizer';
-  id?: string;
+export interface OrganizerLoginResult {
+  success: boolean;
+  userType: 'organizer' | 'sub-organizer' | null;
+  userData?: any;
 }
-
-interface OrganizerAuthContextType {
-  organizerSession: OrganizerSession | null;
-  loginAsOrganizer: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  loginAsSubOrganizer: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  logoutOrganizer: () => void;
-  getOrganizerSession: () => OrganizerSession | null;
-}
-
-const OrganizerAuthContext = createContext<OrganizerAuthContextType | undefined>(undefined);
 
 export const useOrganizerAuth = () => {
-  const context = useContext(OrganizerAuthContext);
-  if (context === undefined) {
-    throw new Error('useOrganizerAuth must be used within an OrganizerAuthProvider');
-  }
-  return context;
-};
-
-interface OrganizerAuthProviderProps {
-  children: ReactNode;
-}
-
-export const OrganizerAuthProvider = ({ children }: OrganizerAuthProviderProps) => {
-  const [organizerSession, setOrganizerSession] = useState<OrganizerSession | null>(null);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const savedSession = localStorage.getItem('organizerSession');
-    if (savedSession) {
-      try {
-        const parsed = JSON.parse(savedSession);
-        setOrganizerSession(parsed);
-      } catch (error) {
-        console.error('Error parsing saved organizer session:', error);
-        localStorage.removeItem('organizerSession');
+  const loginAsOrganizer = async (email: string, password: string): Promise<OrganizerLoginResult> => {
+    setLoading(true);
+    
+    try {
+      // Check if it's the main organizer
+      if (email === 'bfrpietro' && password === '190615') {
+        // Store organizer session in localStorage
+        localStorage.setItem('organizer_session', JSON.stringify({
+          type: 'organizer',
+          email: 'bfrpietro',
+          loginTime: Date.now()
+        }));
+        
+        toast({
+          title: "Sucesso",
+          description: "Login de organizador realizado com sucesso!",
+        });
+        
+        return {
+          success: true,
+          userType: 'organizer',
+          userData: { email: 'bfrpietro' }
+        };
+      } else {
+        toast({
+          title: "Erro",
+          description: "Credenciais de organizador incorretas",
+          variant: "destructive"
+        });
+        
+        return {
+          success: false,
+          userType: null
+        };
       }
-    }
-  }, []);
-
-  const loginAsOrganizer = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    // Main organizer check
-    if (email === 'bfrpietro' && password === 'Pietro@123') {
-      const session: OrganizerSession = {
-        email: 'bfrpietro',
-        type: 'organizer',
-        id: 'organizer_bfrpietro'
+    } catch (error: any) {
+      console.error('Error in organizer login:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao fazer login como organizador",
+        variant: "destructive"
+      });
+      
+      return {
+        success: false,
+        userType: null
       };
-      setOrganizerSession(session);
-      localStorage.setItem('organizerSession', JSON.stringify(session));
-      return { success: true };
+    } finally {
+      setLoading(false);
     }
-
-    return { success: false, error: 'Credenciais inválidas' };
   };
 
-  const loginAsSubOrganizer = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const loginAsSubOrganizer = async (email: string, password: string): Promise<OrganizerLoginResult> => {
+    setLoading(true);
+    
     try {
+      if (!validateEmail(email)) {
+        toast({
+          title: "Erro",
+          description: "Email inválido",
+          variant: "destructive"
+        });
+        return { success: false, userType: null };
+      }
+
+      // Check sub-organizers table
       const { data, error } = await supabase
         .from('sub_organizers')
         .select('*')
-        .eq('email', email)
-        .eq('password', password)
-        .single();
+        .eq('email', sanitizeInput(email))
+        .eq('password', sanitizeInput(password))
+        .maybeSingle();
 
-      if (error || !data) {
-        return { success: false, error: 'Credenciais inválidas' };
+      if (error) {
+        console.error('Error checking sub-organizer:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao verificar credenciais",
+          variant: "destructive"
+        });
+        return { success: false, userType: null };
       }
 
-      const session: OrganizerSession = {
-        email: data.email,
-        type: 'sub_organizer',
-        id: data.id
+      if (data) {
+        // Store sub-organizer session in localStorage
+        localStorage.setItem('organizer_session', JSON.stringify({
+          type: 'sub-organizer',
+          email: data.email,
+          id: data.id,
+          loginTime: Date.now()
+        }));
+        
+        toast({
+          title: "Sucesso",
+          description: "Login de sub-organizador realizado com sucesso!",
+        });
+        
+        return {
+          success: true,
+          userType: 'sub-organizer',
+          userData: data
+        };
+      } else {
+        toast({
+          title: "Erro",
+          description: "Email ou senha de sub-organizador incorretos",
+          variant: "destructive"
+        });
+        
+        return {
+          success: false,
+          userType: null
+        };
+      }
+    } catch (error: any) {
+      console.error('Error in sub-organizer login:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao fazer login como sub-organizador",
+        variant: "destructive"
+      });
+      
+      return {
+        success: false,
+        userType: null
       };
-      setOrganizerSession(session);
-      localStorage.setItem('organizerSession', JSON.stringify(session));
-      return { success: true };
-    } catch (error) {
-      console.error('Error during sub-organizer login:', error);
-      return { success: false, error: 'Erro interno. Tente novamente.' };
+    } finally {
+      setLoading(false);
     }
   };
 
   const logoutOrganizer = () => {
-    setOrganizerSession(null);
-    localStorage.removeItem('organizerSession');
+    localStorage.removeItem('organizer_session');
     toast({
       title: "Logout realizado",
-      description: "Você foi desconectado com sucesso.",
+      description: "Sessão de organizador encerrada",
     });
   };
 
   const getOrganizerSession = () => {
-    return organizerSession;
+    try {
+      const session = localStorage.getItem('organizer_session');
+      if (session) {
+        const parsed = JSON.parse(session);
+        // Check if session is not too old (24 hours)
+        if (Date.now() - parsed.loginTime < 24 * 60 * 60 * 1000) {
+          return parsed;
+        } else {
+          localStorage.removeItem('organizer_session');
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
   };
 
-  const value = {
-    organizerSession,
+  return {
+    loading,
     loginAsOrganizer,
     loginAsSubOrganizer,
     logoutOrganizer,
-    getOrganizerSession,
+    getOrganizerSession
   };
-
-  return (
-    <OrganizerAuthContext.Provider value={value}>
-      {children}
-    </OrganizerAuthContext.Provider>
-  );
 };

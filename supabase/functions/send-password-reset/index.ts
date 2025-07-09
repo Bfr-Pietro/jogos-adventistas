@@ -23,15 +23,18 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { email, username, resetUrl }: PasswordResetRequest = await req.json();
 
+    // Input validation for security
     if (!email || !username || !resetUrl) {
       throw new Error("Missing required fields");
     }
 
+    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       throw new Error("Invalid email format");
     }
 
+    // Sanitize username
     const sanitizedUsername = username.replace(/[<>]/g, '').slice(0, 100);
 
     const emailResponse = await resend.emails.send({

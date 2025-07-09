@@ -118,9 +118,7 @@ const Index = () => {
               </p>
             </div>
             
-            <div className="h-96 w-full">
-              <Map events={events} selectedEvent={selectedEvent} onEventSelect={setSelectedEvent} />
-            </div>
+            <Map events={events} selectedEvent={selectedEvent} onEventSelect={setSelectedEvent} />
           </div>
 
           {/* Event Details Section */}
