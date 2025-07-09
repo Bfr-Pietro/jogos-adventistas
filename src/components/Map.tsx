@@ -30,11 +30,13 @@ interface MapProps {
   onEventSelect: (event: Event) => void;
   isEditing?: boolean;
   onLocationSelect?: (lat: number, lng: number) => void;
+  selectedLocation?: { lat: number; lng: number };
 }
 
-const Map = ({ events, selectedEvent, onEventSelect, isEditing, onLocationSelect }: MapProps) => {
+const Map = ({ events, selectedEvent, onEventSelect, isEditing, onLocationSelect, selectedLocation }: MapProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const selectedMarkerRef = useRef<L.Marker | null>(null);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -62,12 +64,63 @@ const Map = ({ events, selectedEvent, onEventSelect, isEditing, onLocationSelect
     };
   }, [isEditing, onLocationSelect]);
 
+  // Handle selected location marker for editing mode
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !isEditing || !selectedLocation) return;
 
-    // Clear existing markers
+    // Remove existing selected marker
+    if (selectedMarkerRef.current) {
+      mapRef.current.removeLayer(selectedMarkerRef.current);
+    }
+
+    // Create custom icon for selected location
+    const selectedIcon = L.divIcon({
+      html: `<div style="
+        background: #EF4444;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        border: 3px solid white;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        transform: scale(1.2);
+        z-index: 1000;
+      ">📍</div>`,
+      className: 'custom-selected-marker',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15]
+    });
+
+    // Add selected location marker
+    selectedMarkerRef.current = L.marker([selectedLocation.lat, selectedLocation.lng], { icon: selectedIcon })
+      .addTo(mapRef.current)
+      .bindPopup(`
+        <div style="text-align: center; min-width: 150px;">
+          <h3 style="margin: 0 0 10px 0; font-weight: bold; color: #EF4444;">
+            📍 Local Selecionado
+          </h3>
+          <p style="margin: 5px 0; font-size: 12px; color: #666;">
+            Lat: ${selectedLocation.lat.toFixed(4)}<br>
+            Lng: ${selectedLocation.lng.toFixed(4)}
+          </p>
+        </div>
+      `)
+      .openPopup();
+
+    // Center map on selected location
+    mapRef.current.setView([selectedLocation.lat, selectedLocation.lng], 15);
+
+  }, [selectedLocation, isEditing]);
+
+  useEffect(() => {
+    if (!mapRef.current || isEditing) return;
+
+    // Clear existing markers (except selected location marker)
     mapRef.current.eachLayer((layer) => {
-      if (layer instanceof L.Marker) {
+      if (layer instanceof L.Marker && layer !== selectedMarkerRef.current) {
         mapRef.current?.removeLayer(layer);
       }
     });
@@ -144,7 +197,7 @@ const Map = ({ events, selectedEvent, onEventSelect, isEditing, onLocationSelect
         mapRef.current.setView([event.lat, event.lng], 15);
       }
     });
-  }, [events, selectedEvent, onEventSelect]);
+  }, [events, selectedEvent, onEventSelect, isEditing]);
 
   return (
     <div className="relative w-full h-96 rounded-lg shadow-lg overflow-hidden border-2 border-gray-200">
@@ -175,6 +228,12 @@ const Map = ({ events, selectedEvent, onEventSelect, isEditing, onLocationSelect
             <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
             <span>Ambos</span>
           </div>
+          {isEditing && (
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              <span>Selecionado</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

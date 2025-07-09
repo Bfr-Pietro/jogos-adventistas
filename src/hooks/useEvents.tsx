@@ -28,7 +28,7 @@ export const useEvents = () => {
     try {
       setLoading(true);
       
-      // Simple query without complex joins to avoid LockManager issues
+      // Simple query to get all events
       const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select('*')
@@ -36,7 +36,13 @@ export const useEvents = () => {
 
       if (eventsError) {
         console.error('Error fetching events:', eventsError);
-        throw new Error('Erro ao carregar eventos');
+        toast({
+          title: "Erro ao carregar eventos",
+          description: "Tente recarregar a página",
+          variant: "destructive"
+        });
+        setEvents([]);
+        return;
       }
 
       if (!eventsData) {
@@ -67,7 +73,6 @@ export const useEvents = () => {
         }
       } catch (confirmError) {
         console.warn('Could not fetch confirmations:', confirmError);
-        // Continue without confirmations rather than failing
       }
 
       // Combine events with confirmations
@@ -84,7 +89,7 @@ export const useEvents = () => {
         description: "Tente recarregar a página",
         variant: "destructive"
       });
-      setEvents([]); // Set empty array on error
+      setEvents([]);
     } finally {
       setLoading(false);
     }
@@ -166,43 +171,32 @@ export const useEvents = () => {
   useEffect(() => {
     fetchEvents();
 
-    // Set up real-time subscriptions with error handling
-    let eventsSubscription: any;
-    let confirmationsSubscription: any;
+    // Set up real-time subscriptions
+    const eventsSubscription = supabase
+      .channel('events-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'events'
+      }, () => {
+        fetchEvents();
+      })
+      .subscribe();
 
-    try {
-      eventsSubscription = supabase
-        .channel('events-changes')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'events'
-        }, () => {
-          fetchEvents();
-        })
-        .subscribe();
-
-      confirmationsSubscription = supabase
-        .channel('confirmations-changes')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'event_confirmations'
-        }, () => {
-          fetchEvents();
-        })
-        .subscribe();
-    } catch (subscriptionError) {
-      console.warn('Could not set up real-time subscriptions:', subscriptionError);
-    }
+    const confirmationsSubscription = supabase
+      .channel('confirmations-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'event_confirmations'
+      }, () => {
+        fetchEvents();
+      })
+      .subscribe();
 
     return () => {
-      try {
-        if (eventsSubscription) supabase.removeChannel(eventsSubscription);
-        if (confirmationsSubscription) supabase.removeChannel(confirmationsSubscription);
-      } catch (cleanupError) {
-        console.warn('Error cleaning up subscriptions:', cleanupError);
-      }
+      supabase.removeChannel(eventsSubscription);
+      supabase.removeChannel(confirmationsSubscription);
     };
   }, []);
 

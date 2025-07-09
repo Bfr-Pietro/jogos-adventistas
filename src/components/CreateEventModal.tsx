@@ -115,10 +115,10 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
     setIsLoading(true);
     
     try {
-      // Create organizer user ID - improved security
-      const organizerUserId = `org_${organizerSession.type}_${organizerSession.email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      // Use a simple string format for created_by instead of trying to use UUID
+      const organizerIdentifier = `${organizerSession.type}_${organizerSession.email}`;
 
-      console.log('Creating event with organizer ID:', organizerUserId);
+      console.log('Creating event with organizer identifier:', organizerIdentifier);
 
       const { data, error } = await supabase.from('events').insert({
         type: eventData.type,
@@ -127,7 +127,7 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
         time: eventData.time,
         lat: eventData.lat,
         lng: eventData.lng,
-        created_by: organizerUserId,
+        created_by: organizerIdentifier,
         status: 'Por acontecer'
       }).select();
 
@@ -245,6 +245,7 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
                     onEventSelect={() => {}}
                     isEditing={true}
                     onLocationSelect={handleLocationSelect}
+                    selectedLocation={{ lat: formData.lat, lng: formData.lng }}
                   />
                   <p className="text-sm text-gray-600 mt-2">
                     Coordenadas: {formData.lat.toFixed(4)}, {formData.lng.toFixed(4)}
