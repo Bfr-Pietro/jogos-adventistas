@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -60,8 +59,11 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     
     if (!signupForm.username) {
       errors.push('Nome de usuário é obrigatório');
-    } else if (!validateUsername(signupForm.username)) {
-      errors.push('Nome de usuário deve ter 3-50 caracteres (apenas letras, números e _)');
+    } else {
+      const usernameValidation = validateUsername(signupForm.username);
+      if (!usernameValidation.isValid) {
+        errors.push(...usernameValidation.errors);
+      }
     }
     
     if (!signupForm.password) {
@@ -69,7 +71,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     } else {
       const passwordValidation = validatePassword(signupForm.password);
       if (!passwordValidation.isValid) {
-        errors.push(passwordValidation.message);
+        errors.push(...passwordValidation.errors);
       }
     }
     
@@ -315,7 +317,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                         maxLength={50}
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        3-50 caracteres, apenas letras, números e _
+                        Mínimo 2 caracteres
                       </p>
                     </div>
                     <div>
@@ -343,7 +345,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                         required
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Mínimo 8 caracteres, incluindo letras e números
+                        Mínimo 6 caracteres
                       </p>
                     </div>
                     
