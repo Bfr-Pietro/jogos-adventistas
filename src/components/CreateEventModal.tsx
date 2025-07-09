@@ -10,7 +10,7 @@ import { Calendar, Clock, MapPin, Save, X } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { validateEventData, sanitizeInput } from '@/utils/validation';
 import { useOrganizerAuth } from '@/hooks/useOrganizerAuth';
-import Map from '@/components/Map';
+import GoogleMapSelector from '@/components/GoogleMapSelector';
 
 interface CreateEventModalProps {
   isOpen: boolean;
@@ -42,8 +42,8 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
     }
   };
 
-  const handleLocationSelect = (lat: number, lng: number) => {
-    setFormData(prev => ({ ...prev, lat, lng }));
+  const handleLocationSelect = (lat: number, lng: number, address: string) => {
+    setFormData(prev => ({ ...prev, lat, lng, address }));
     setShowMap(false);
     toast({
       title: "Localização selecionada",
@@ -54,7 +54,6 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate sports selection
     if (!isFutebol && !isVolei) {
       toast({
         title: "Erro",
@@ -64,7 +63,6 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
       return;
     }
 
-    // Check organizer session
     const organizerSession = getOrganizerSession();
     if (!organizerSession) {
       toast({
@@ -75,7 +73,6 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
       return;
     }
 
-    // Prepare sports data
     const sports = [];
     if (isFutebol) sports.push('futebol');
     if (isVolei) sports.push('volei');
@@ -86,7 +83,6 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
       address: sanitizeInput(formData.address)
     };
 
-    // Enhanced date validation - allow today's date
     const selectedDate = new Date(eventData.date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -101,7 +97,6 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
       return;
     }
 
-    // Validate all event data
     const validation = validateEventData(eventData);
     if (!validation.isValid) {
       toast({
@@ -115,8 +110,7 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
     setIsLoading(true);
     
     try {
-      // Use a simple string format for created_by instead of trying to use UUID
-      const organizerIdentifier = `${organizerSession.type}_${organizerSession.email}`;
+      const organizerIdentifier = organizerSession.id || `organizer_${organizerSession.email}`;
 
       console.log('Creating event with organizer identifier:', organizerIdentifier);
 
@@ -148,7 +142,6 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
         description: "Evento criado com sucesso!",
       });
 
-      // Reset form
       setFormData({
         type: '',
         address: '',
@@ -226,7 +219,7 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
           </div>
 
           <div>
-            <Label>Localização no Mapa</Label>
+            <Label>Selecionar Localização no Mapa</Label>
             <div className="space-y-2">
               <Button
                 type="button"
@@ -239,13 +232,9 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }: CreateEventModalP
               </Button>
               {showMap && (
                 <div className="border rounded-lg p-2">
-                  <Map
-                    events={[]}
-                    selectedEvent={null}
-                    onEventSelect={() => {}}
-                    isEditing={true}
+                  <GoogleMapSelector
                     onLocationSelect={handleLocationSelect}
-                    selectedLocation={{ lat: formData.lat, lng: formData.lng }}
+                    initialLocation={{ lat: formData.lat, lng: formData.lng }}
                   />
                   <p className="text-sm text-gray-600 mt-2">
                     Coordenadas: {formData.lat.toFixed(4)}, {formData.lng.toFixed(4)}
