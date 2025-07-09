@@ -1,7 +1,9 @@
 
-import React, { useEffect, useRef } from 'react';
-import { MapPin } from 'lucide-react';
-import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
+import React, { useState, useCallback, useEffect } from 'react';
+import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { MapPin, Calendar, Clock, Users } from "lucide-react";
 
 interface Event {
   id: string;
@@ -9,113 +11,109 @@ interface Event {
   address: string;
   date: string;
   time: string;
-  status: 'Por acontecer' | 'Em andamento' | 'Encerrado';
   lat: number;
   lng: number;
-  confirmed: string[];
+  status: string;
+  confirmed?: string[];
 }
 
 interface MapProps {
   events: Event[];
-  selectedEvent: Event | null;
-  onEventSelect: (event: Event) => void;
-  isEditing?: boolean;
-  onLocationSelect?: (lat: number, lng: number) => void;
-  selectedLocation?: { lat: number; lng: number };
+  selectedEvent?: Event | null;
+  onEventSelect?: (event: Event) => void;
 }
 
 const mapContainerStyle = {
   width: '100%',
-  height: '100%'
+  height: '400px'
 };
 
-const Map = ({ events, selectedEvent, onEventSelect, isEditing, onLocationSelect, selectedLocation }: MapProps) => {
-  const [map, setMap] = React.useState<google.maps.Map | null>(null);
-  const [selectedMarker, setSelectedMarker] = React.useState<google.maps.Marker | null>(null);
+const defaultCenter = {
+  lat: -23.5505,
+  lng: -46.6333
+};
 
-  const onLoad = React.useCallback((mapInstance: google.maps.Map) => {
-    setMap(mapInstance);
+const Map = ({ events, selectedEvent, onEventSelect }: MapProps) => {
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [infoWindow, setInfoWindow] = useState<Event | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  const onLoad = useCallback((map: google.maps.Map) => {
+    setMap(map);
+    setIsLoaded(true);
   }, []);
 
-  const onUnmount = React.useCallback(() => {
+  const onUnmount = useCallback(() => {
     setMap(null);
+    setIsLoaded(false);
   }, []);
 
-  const handleMapClick = React.useCallback((event: google.maps.MapMouseEvent) => {
-    if (isEditing && onLocationSelect && event.latLng) {
-      const lat = event.latLng.lat();
-      const lng = event.latLng.lng();
-      onLocationSelect(lat, lng);
-    }
-  }, [isEditing, onLocationSelect]);
-
-  // Handle selected location marker for editing mode
-  React.useEffect(() => {
-    if (!map || !isEditing || !selectedLocation) return;
-
-    // Remove existing selected marker
-    if (selectedMarker) {
-      selectedMarker.setMap(null);
-    }
-
-    // Create new selected marker
-    const marker = new google.maps.Marker({
-      position: selectedLocation,
-      map: map,
-      icon: {
-        url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
-          <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="20" cy="20" r="15" fill="#EF4444" stroke="#FFFFFF" stroke-width="3"/>
-            <text x="20" y="26" text-anchor="middle" fill="white" font-size="16" font-family="Arial">📍</text>
-          </svg>
-        `),
-        scaledSize: new google.maps.Size(40, 40),
-        anchor: new google.maps.Point(20, 20)
-      },
-      title: 'Local Selecionado'
-    });
-
-    setSelectedMarker(marker);
-    map.setCenter(selectedLocation);
-    map.setZoom(15);
-
-  }, [selectedLocation, isEditing, map, selectedMarker]);
-
-  const getSportIcon = (eventType: string) => {
-    const sportIcons: { [key: string]: string } = {
-      'futebol': '⚽',
-      'volei': '🏐',
-      'futebol,volei': '🏆',
-      'volei,futebol': '🏆'
-    };
-    return sportIcons[eventType] || '🏆';
+  const handleMarkerClick = (event: Event) => {
+    setInfoWindow(event);
+    onEventSelect?.(event);
   };
 
-  const getSportColor = (eventType: string) => {
-    if (eventType.includes('futebol') && eventType.includes('volei')) return '#8B5CF6';
-    if (eventType.includes('futebol')) return '#10B981';
-    return '#3B82F6';
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Por acontecer': return 'bg-blue-500';
+      case 'Em andamento': return 'bg-green-500';
+      case 'Encerrado': return 'bg-gray-500';
+      default: return 'bg-blue-500';
+    }
+  };
+
+  const getGameIcon = (type: string) => {
+    if (type.includes('futebol') && type.includes('volei')) return '🏆';
+    return type.includes('futebol') ? '⚽' : '🏐';
+  };
+
+  const getGameName = (type: string) => {
+    const sports = type.split(',').map(sport => 
+      sport.charAt(0).toUpperCase() + sport.slice(1)
+    );
+    return sports.join(' + ');
+  };
+
+  // Create custom marker icon
+  const createCustomMarker = (type: string) => {
+    const icon = getGameIcon(type);
+    return {
+      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+        <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="18" fill="#10B981" stroke="#ffffff" stroke-width="2"/>
+          <text x="20" y="28" text-anchor="middle" font-size="16" fill="white">${icon}</text>
+        </svg>
+      `)}`,
+      scaledSize: new google.maps.Size(40, 40),
+      anchor: new google.maps.Point(20, 20)
+    };
+  };
+
+  // Focus on selected event
+  useEffect(() => {
+    if (selectedEvent && map && isLoaded) {
+      map.panTo({ lat: selectedEvent.lat, lng: selectedEvent.lng });
+      map.setZoom(15);
+      setInfoWindow(selectedEvent);
+    }
+  }, [selectedEvent, map, isLoaded]);
+
+  const handleLoadError = () => {
+    console.error('Google Maps failed to load');
   };
 
   return (
-    <div className="relative w-full h-96 rounded-lg shadow-lg overflow-hidden border-2 border-gray-200">
-      {/* Map Title */}
-      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md z-[1000]">
-        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-green-600" />
-          {isEditing ? 'Clique no mapa para selecionar local' : 'Mapa dos Jogos'}
-        </h3>
-      </div>
-      
-      {/* Google Maps Container */}
-      <LoadScript googleMapsApiKey="AIzaSyBFw0Qbyq9zTFTd-tUY6dO_hgQEVgZU1U0">
+    <div className="w-full h-full rounded-lg overflow-hidden shadow-lg">
+      <LoadScript
+        googleMapsApiKey="AIzaSyDxQKcWgHcRlLjEYjTrv_tYLdLJHoFCqYQ"
+        onError={handleLoadError}
+      >
         <GoogleMap
           mapContainerStyle={mapContainerStyle}
-          center={{ lat: -23.5505, lng: -46.6333 }}
-          zoom={12}
+          center={defaultCenter}
+          zoom={11}
           onLoad={onLoad}
           onUnmount={onUnmount}
-          onClick={handleMapClick}
           options={{
             zoomControl: true,
             streetViewControl: false,
@@ -123,51 +121,61 @@ const Map = ({ events, selectedEvent, onEventSelect, isEditing, onLocationSelect
             fullscreenControl: false,
           }}
         >
-          {!isEditing && events.map((event) => (
+          {events.map((event) => (
             <Marker
               key={event.id}
               position={{ lat: event.lat, lng: event.lng }}
-              onClick={() => onEventSelect(event)}
-              icon={{
-                url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
-                  <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="20" cy="20" r="15" fill="${getSportColor(event.type)}" stroke="#FFFFFF" stroke-width="3"/>
-                    <text x="20" y="26" text-anchor="middle" fill="white" font-size="16" font-family="Arial">${getSportIcon(event.type)}</text>
-                  </svg>
-                `),
-                scaledSize: new google.maps.Size(40, 40),
-                anchor: new google.maps.Point(20, 20)
-              }}
-              title={`${event.type} - ${event.date} ${event.time}`}
+              icon={createCustomMarker(event.type)}
+              onClick={() => handleMarkerClick(event)}
+              title={`${getGameName(event.type)} - ${event.address}`}
             />
           ))}
+
+          {infoWindow && (
+            <InfoWindow
+              position={{ lat: infoWindow.lat, lng: infoWindow.lng }}
+              onCloseClick={() => setInfoWindow(null)}
+            >
+              <Card className="w-64 border-none shadow-none">
+                <CardContent className="p-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-sm flex items-center gap-1">
+                        <span>{getGameIcon(infoWindow.type)}</span>
+                        {getGameName(infoWindow.type)}
+                      </h3>
+                      <Badge className={`${getStatusColor(infoWindow.status)} text-white text-xs`}>
+                        {infoWindow.status}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-start gap-1 text-xs text-gray-600">
+                      <MapPin className="h-3 w-3 mt-0.5 text-green-600" />
+                      <span>{infoWindow.address}</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 text-xs text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3 text-blue-600" />
+                        <span>{new Date(infoWindow.date).toLocaleDateString('pt-BR')}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-blue-600" />
+                        <span>{infoWindow.time}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                      <Users className="h-3 w-3 text-green-600" />
+                      <span>{infoWindow.confirmed?.length || 0} confirmados</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </InfoWindow>
+          )}
         </GoogleMap>
       </LoadScript>
-      
-      {/* Map Legend */}
-      <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md z-[1000]">
-        <div className="text-xs font-semibold text-gray-700 mb-2">Legenda</div>
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span>Futebol</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            <span>Vôlei</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-            <span>Ambos</span>
-          </div>
-          {isEditing && (
-            <div className="flex items-center gap-2 text-xs">
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              <span>Selecionado</span>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 };
